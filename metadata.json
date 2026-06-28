@@ -1,0 +1,6 @@
+{
+  "name": "Selvix Game Zone",
+  "description": "App nzuri ya michezo (Selvix Game Zone) iliyo na mfumo rahisi wa watumiaji kupata zawadi za kila siku, kuchat, na kununua magemu ya PC, Emulator, na Mobile.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

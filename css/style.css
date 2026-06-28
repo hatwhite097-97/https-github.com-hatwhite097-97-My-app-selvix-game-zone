@@ -1,0 +1,208 @@
+/* Custom Styles for Selvix Game Zone - Modern Glassmorphism & Cyberpunk-Gamer Aesthetics */
+
+:root {
+  --neon-cyan: #00f0ff;
+  --neon-magenta: #ff007f;
+  --dark-bg: #0b0f19;
+  --card-bg: rgba(22, 28, 45, 0.6);
+  --glass-border: rgba(255, 255, 255, 0.08);
+  --text-color: #e2e8f0;
+  --text-muted: #94a3b8;
+  --header-bg: rgba(11, 15, 25, 0.8);
+  --accent-color: #ff007f;
+  --btn-grad-start: #00f0ff;
+  --btn-grad-end: #ff007f;
+}
+
+body.theme-light {
+  --neon-cyan: #0284c7;
+  --neon-magenta: #db2777;
+  --dark-bg: #f8fafc;
+  --card-bg: rgba(255, 255, 255, 0.92);
+  --glass-border: rgba(0, 0, 0, 0.08);
+  --text-color: #0f172a;
+  --text-muted: #64748b;
+  --header-bg: rgba(241, 245, 249, 0.9);
+  --accent-color: #db2777;
+  --btn-grad-start: #0284c7;
+  --btn-grad-end: #db2777;
+}
+
+body.theme-orange {
+  --neon-cyan: #1e3a8a;
+  --neon-magenta: #ff6b00;
+  --dark-bg: #120000; /* Dark deep red/black for the maroon store style, or deep orange/navy */
+  --card-bg: rgba(28, 12, 12, 0.75);
+  --glass-border: rgba(255, 107, 0, 0.2);
+  --text-color: #ffffff;
+  --text-muted: #cbd5e1;
+  --header-bg: rgba(18, 0, 0, 0.85);
+  --accent-color: #ff6b00;
+  --btn-grad-start: #3b82f6;
+  --btn-grad-end: #ff6b00;
+}
+
+body {
+  background-color: var(--dark-bg);
+  background-image: 
+    radial-gradient(circle at 10% 20%, rgba(0, 240, 255, 0.05) 0%, transparent 40%),
+    radial-gradient(circle at 90% 80%, rgba(255, 0, 127, 0.05) 0%, transparent 40%);
+  color: var(--text-color);
+  font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  overflow-x: hidden;
+  margin: 0;
+  padding: 0;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+body.theme-light {
+  background-image: 
+    radial-gradient(circle at 10% 20%, rgba(2, 132, 199, 0.05) 0%, transparent 40%),
+    radial-gradient(circle at 90% 80%, rgba(219, 39, 119, 0.05) 0%, transparent 40%);
+}
+
+body.theme-light .text-white,
+body.theme-light h1,
+body.theme-light h2,
+body.theme-light h3,
+body.theme-light h4 {
+  color: #0f172a !important;
+}
+
+body.theme-light .text-gray-400,
+body.theme-light .text-gray-300,
+body.theme-light .text-gray-200,
+body.theme-light p {
+  color: #475569 !important;
+}
+
+body.theme-light .text-cyan-400 {
+  color: #0284c7 !important;
+}
+
+body.theme-light .text-pink-500 {
+  color: #db2777 !important;
+}
+
+body.theme-light .glass-panel {
+  background: rgba(255, 255, 255, 0.95) !important;
+  border-color: rgba(0, 0, 0, 0.1) !important;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05) !important;
+}
+
+body.theme-light header.glass-panel,
+body.theme-light nav.glass-panel {
+  background: rgba(241, 245, 249, 0.95) !important;
+  border-color: rgba(0, 0, 0, 0.1) !important;
+}
+
+body.theme-orange {
+  background-image: 
+    radial-gradient(circle at 10% 20%, rgba(59, 130, 246, 0.08) 0%, transparent 40%),
+    radial-gradient(circle at 90% 80%, rgba(255, 107, 0, 0.08) 0%, transparent 40%);
+}
+
+/* Glassmorphism Classes */
+.glass-panel {
+  background: var(--card-bg);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--glass-border);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+}
+
+.glass-panel-hover:hover {
+  border-color: rgba(0, 240, 255, 0.3);
+  box-shadow: 0 8px 32px 0 rgba(0, 240, 255, 0.1);
+  transform: translateY(-2px);
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: rgba(11, 15, 25, 0.5);
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(0, 240, 255, 0.3);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--neon-cyan);
+}
+
+/* Glow Effects */
+.text-glow-cyan {
+  text-shadow: 0 0 10px rgba(0, 240, 255, 0.6);
+}
+.text-glow-magenta {
+  text-shadow: 0 0 10px rgba(255, 0, 127, 0.6);
+}
+.shadow-glow-cyan {
+  box-shadow: 0 0 15px rgba(0, 240, 255, 0.4);
+}
+.shadow-glow-magenta {
+  box-shadow: 0 0 15px rgba(255, 0, 127, 0.4);
+}
+
+/* Custom Input Underline style */
+.cyber-input {
+  background: rgba(15, 23, 42, 0.8);
+  border: 1px solid var(--glass-border);
+  color: var(--text-color);
+  transition: all 0.3s ease;
+}
+body.theme-light .cyber-input {
+  background: rgba(255, 255, 255, 0.95);
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  color: #0f172a;
+}
+.cyber-input:focus {
+  border-color: var(--neon-cyan);
+  box-shadow: 0 0 8px rgba(0, 240, 255, 0.4);
+  outline: none;
+}
+
+/* Animated Gift Box for Daily Rewards */
+@keyframes bounce {
+  0%, 100% { transform: translateY(0) scale(1); }
+  50% { transform: translateY(-15px) scale(1.05); }
+}
+@keyframes pulseGlow {
+  0%, 100% { box-shadow: 0 0 15px rgba(0, 240, 255, 0.4); }
+  50% { box-shadow: 0 0 30px rgba(0, 240, 255, 0.8); }
+}
+.gift-box-animate {
+  animation: bounce 2s infinite ease-in-out, pulseGlow 2s infinite ease-in-out;
+}
+
+/* Fade In Transitions */
+.fade-in {
+  animation: fadeIn 0.4s ease-out forwards;
+}
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Sliding Tabs Animation */
+.tab-transition {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Touch Target Minimum Helper */
+.interactive-target {
+  min-height: 48px;
+  min-width: 48px;
+}
+
+/* Hide scrollbar utility */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}

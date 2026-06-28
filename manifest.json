@@ -1,0 +1,18 @@
+{
+  "name": "Selvix Game Zone",
+  "short_name": "Selvix",
+  "description": "Jukwaa la Michezo, Mialiko, na Jamii ya Gamers nchini Tanzania!",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#0d1117",
+  "theme_color": "#161b22",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "https://cdn.phototourl.com/member/2026-06-26-c8b3db6d-a763-4ee2-b235-16a7d6d70717.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
