@@ -1,5 +1,12 @@
 -- Supabase SQL Schema for Selvix Game Zone
 
+-- 0. Clean up existing tables (Optional: useful for re-running the script)
+DROP TABLE IF EXISTS public.transactions CASCADE;
+DROP TABLE IF EXISTS public.settings CASCADE;
+DROP TABLE IF EXISTS public.chats CASCADE;
+DROP TABLE IF EXISTS public.games CASCADE;
+DROP TABLE IF EXISTS public.users CASCADE;
+
 -- 1. Create Tables
 
 -- Users Table
