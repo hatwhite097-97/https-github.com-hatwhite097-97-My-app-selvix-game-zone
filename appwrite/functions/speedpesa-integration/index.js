@@ -33,14 +33,20 @@ module.exports = async function (context) {
           amount: payload.amount.toString(),
           reference: 'TX-' + Date.now()
         }, {
-          headers: { 'Authorization': `Bearer ${apiKey}` }
+          headers: { 
+            'Authorization': `Bearer ${apiKey}`,
+            'x-api-key': apiKey
+          }
         });
         return context.res.json({ success: true, message: "Malipo yameombwa", data: payinResponse.data });
 
       case 'CHECK_STATUS':
         // 2. Transaction Status Check API Integration
         const statusResponse = await axios.get(`https://api.speedpesa.com/v1/payments/status/${payload.reference}`, {
-          headers: { 'Authorization': `Bearer ${apiKey}` }
+          headers: { 
+            'Authorization': `Bearer ${apiKey}`,
+            'x-api-key': apiKey
+          }
         });
         
         const currentStatus = statusResponse.data.status;
@@ -73,14 +79,20 @@ module.exports = async function (context) {
           amount: payload.amount.toString(),
           reference: 'WD-' + Date.now()
         }, {
-          headers: { 'Authorization': `Bearer ${apiKey}` }
+          headers: { 
+            'Authorization': `Bearer ${apiKey}`,
+            'x-api-key': apiKey
+          }
         });
         return context.res.json({ success: true, message: "Kutoa fedha kumeshughulikiwa", data: payoutResponse.data });
 
       case 'CHECK_BALANCE':
         // 4. Live Merchant Account Balance Check API Integration
         const balanceResponse = await axios.get('https://api.speedpesa.com/v1/merchant/balance', {
-          headers: { 'Authorization': `Bearer ${apiKey}` }
+          headers: { 
+            'Authorization': `Bearer ${apiKey}`,
+            'x-api-key': apiKey
+          }
         });
         return context.res.json({ success: true, balance: balanceResponse.data.balance });
 
