@@ -608,17 +608,15 @@ class SelvixApp {
   handleSaveAppwriteConfig() {
     const end = document.getElementById('cfg-endpoint').value.trim();
     const proj = document.getElementById('cfg-project').value.trim();
-    const dbId = document.getElementById('cfg-dbid').value.trim();
 
-    if (!proj) {
-      alert("Tafadhali weka Project ID angalau!");
+    if (!proj || !end) {
+      alert("Tafadhali weka Supabase URL na Anon Key!");
       return;
     }
 
     window.appwrite.updateConfig({
-      endpoint: end || 'https://cloud.appwrite.io/v1',
-      projectId: proj,
-      databaseId: dbId || 'selvix_db'
+      url: end,
+      anon_key: proj
     });
   }
 
@@ -1233,24 +1231,20 @@ class SelvixApp {
           </div>
 
           <div class="glass-panel p-6 rounded-3xl border border-pink-900 bg-gradient-to-br from-gray-900 to-pink-950">
-            <h3 class="font-bold text-white text-sm uppercase mb-2 text-glow-magenta"><i class="fa-solid fa-database mr-2"></i>APPWRITE DATABASE INTEGRATION PANEL</h3>
-            <p class="text-xs text-gray-400 mb-4">Weka maelezo ya endpoint na Project ID yako ya Appwrite ili kusawazisha Database ya Selvix na Wingu!</p>
+            <h3 class="font-bold text-white text-sm uppercase mb-2 text-glow-magenta"><i class="fa-solid fa-database mr-2"></i>SUPABASE INTEGRATION PANEL</h3>
+            <p class="text-xs text-gray-400 mb-4">Weka maelezo ya URL na Anon Key yako ya Supabase ili kusawazisha Database ya Selvix na Wingu!</p>
             <div class="space-y-3">
               <div>
-                <label class="block text-[10px] uppercase text-cyan-400 font-bold mb-1">Appwrite Endpoint</label>
-                <input type="text" id="cfg-endpoint" value="${window.appwrite.config.endpoint}" class="w-full p-2.5 rounded-lg cyber-input text-white text-xs" />
+                <label class="block text-[10px] uppercase text-cyan-400 font-bold mb-1">Supabase URL</label>
+                <input type="text" id="cfg-endpoint" value="${window.appwrite.config.supabaseUrl}" class="w-full p-2.5 rounded-lg cyber-input text-white text-xs" />
               </div>
               <div>
-                <label class="block text-[10px] uppercase text-cyan-400 font-bold mb-1">Appwrite Project ID</label>
-                <input type="text" id="cfg-project" value="${window.appwrite.config.projectId}" placeholder="Mf: 66a93b4e00192e4c9e83" class="w-full p-2.5 rounded-lg cyber-input text-white text-xs" />
-              </div>
-              <div>
-                <label class="block text-[10px] uppercase text-cyan-400 font-bold mb-1">Database ID</label>
-                <input type="text" id="cfg-dbid" value="${window.appwrite.config.databaseId}" class="w-full p-2.5 rounded-lg cyber-input text-white text-xs" />
+                <label class="block text-[10px] uppercase text-cyan-400 font-bold mb-1">Supabase Anon Key</label>
+                <input type="text" id="cfg-project" value="${window.appwrite.config.supabaseKey}" placeholder="eyJhb..." class="w-full p-2.5 rounded-lg cyber-input text-white text-xs" />
               </div>
               <button data-action="save-appwrite" 
                       class="w-full py-3 rounded-xl bg-pink-600 hover:bg-pink-700 text-white font-bold uppercase tracking-wider text-xs shadow-glow-magenta interactive-target">
-                Unganisha Wingu la Appwrite
+                Unganisha Wingu la Supabase
               </button>
             </div>
           </div>
