@@ -330,12 +330,13 @@ class SelvixApp {
     const game = this.selectedGame;
     if (!user || !game) return;
 
-    if (user.pointsBalance < game.price) {
-      alert("Coins hazitoshi! Unahitaji TZS " + game.price + " ila una TZS " + user.pointsBalance + ".");
+    const currentBalance = parseFloat(user.pointsBalance || 0);
+    if (currentBalance < game.price) {
+      alert("Coins hazitoshi! Unahitaji TZS " + game.price + " ila una TZS " + currentBalance + ".");
       return;
     }
 
-    user.pointsBalance -= game.price;
+    user.pointsBalance = currentBalance - game.price;
     window.db.updateUser(user);
 
     // Record successful transaction
@@ -1071,7 +1072,7 @@ class SelvixApp {
           </div>
           
           <div class="flex justify-between items-center text-xs">
-            <span class="text-gray-400">Salio: <strong class="text-yellow-400">TZS ${user.pointsBalance.toFixed(0)}</strong></span>
+            <span class="text-gray-400">Salio: <strong class="text-yellow-400">TZS ${(user.pointsBalance || 0).toFixed(0)}</strong></span>
             
             <div data-action="logout" class="flex items-center text-gray-400 hover:text-white cursor-pointer font-bold gap-1">
               <i class="fa-solid fa-right-from-bracket text-[10px]"></i> Toka
@@ -1599,7 +1600,7 @@ class SelvixApp {
         <div class="glass-panel p-6 rounded-3xl bg-gradient-to-br from-indigo-950 to-gray-900 border-indigo-900 flex items-center justify-between">
           <div>
             <p class="text-xs text-indigo-400 font-bold uppercase tracking-wider">Kiasi Kinachoweza Kutolewa</p>
-            <h2 class="text-3xl font-black text-yellow-400 text-glow-cyan mt-1">TZS ${user.pointsBalance.toFixed(0)}</h2>
+            <h2 class="text-3xl font-black text-yellow-400 text-glow-cyan mt-1">TZS ${(user.pointsBalance || 0).toFixed(0)}</h2>
             <p class="text-[10px] text-gray-400 mt-1">Sawa na Coins ${(user.pointsBalance || 0).toFixed(0)}</p>
           </div>
           <i class="fa-solid fa-wallet text-4xl text-indigo-500"></i>
