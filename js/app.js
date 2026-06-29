@@ -109,14 +109,13 @@ class SelvixApp {
       case 'claim-reward':
         this.handleClaimReward();
         break;
-      case 'send-chat':
-        this.handleSendChat();
-        break;
       case 'buy-coins':
-        this.handleBuyWithCoins();
-        break;
+      case 'buy-coins':
       case 'buy-speedpesa':
         this.handleBuyWithSpeedPesa();
+        break;
+      case 'send-chat':
+        this.handleSendChat();
         break;
       case 'request-withdrawal':
         this.handleWithdrawalRequest();
