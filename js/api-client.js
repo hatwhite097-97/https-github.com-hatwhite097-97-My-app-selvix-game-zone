@@ -40,6 +40,22 @@ class SelvixAPI {
     return data;
   }
 
+  _mapUser(u) {
+    if (!u) return u;
+    return {
+      id: u.id,
+      username: u.username,
+      fullName: u.full_name || u.fullName,
+      phoneNumber: u.phone_number || u.phoneNumber,
+      isAdmin: u.is_admin == 1 || u.isAdmin === true,
+      isBlockedFromChatting: u.is_blocked_from_chatting == 1 || u.isBlockedFromChatting === true,
+      pointsBalance: parseFloat(u.points_balance || u.pointsBalance || 0),
+      streakCount: parseInt(u.streak_count || u.streakCount || 0),
+      lastRewardClaimedDate: u.last_reward_claimed_date || u.lastRewardClaimedDate,
+      referredBy: u.referred_by || u.referredBy
+    };
+  }
+
   // --- Auth & Users ---
   async register(username, email, password, fullName, phoneNumber, referredBy) {
     if (!this.isActive) {
@@ -76,7 +92,7 @@ class SelvixAPI {
         referredBy
       });
       // Sync with local DB for session
-      const userDoc = data.user;
+      const userDoc = this._mapUser(data.user);
       window.db.setCurrentUser(userDoc);
       return userDoc;
     } catch (err) {
@@ -99,7 +115,7 @@ class SelvixAPI {
         username: usernameOrEmail,
         password: password
       });
-      const userDoc = data.user;
+      const userDoc = this._mapUser(data.user);
       window.db.setCurrentUser(userDoc);
       return userDoc;
     } catch (err) {
