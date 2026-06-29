@@ -192,15 +192,7 @@ class SelvixApp {
   }
 
   async handleGoogleLogin() {
-    if (window.appwrite.isActive) {
-      try {
-        await window.appwrite.loginWithGoogle();
-      } catch (err) {
-        alert("Google Sign-In imefeli: " + err.message);
-      }
-    } else {
-      alert("Ili kucheza na kuingia kwa kutumia Google, lazima uunganishe na uweke maelezo ya akaunti yako ya Appwrite. Unaweza kuomba nikuwekee kwa kunipatia Project ID na Endpoint kwenye soga ya AI Studio!");
-    }
+    alert("Google Sign-In inahitaji usanidi zaidi kwenye cPanel. Kwa sasa tumia fomu ya kawaida ya kujiandikisha au kuingia.");
   }
 
   // --- Auth Handlers ---
@@ -662,24 +654,22 @@ class SelvixApp {
     this.render();
   }
 
-  // --- Supabase Configuration Save ---
+  // --- API Configuration Save ---
   handleSaveAppwriteConfig() {
     const end = document.getElementById('cfg-endpoint').value.trim();
-    const proj = document.getElementById('cfg-project').value.trim();
 
-    if (!proj || !end) {
-      alert("Tafadhali weka Supabase URL na Anon Key!");
+    if (!end) {
+      alert("Tafadhali weka API Endpoint URL yako!");
       return;
     }
 
-    window.appwrite.updateConfig({
-      url: end,
-      anon_key: proj
+    window.api.updateConfig({
+      url: end
     });
   }
 
   // --- Payment Info Config Save ---
-  handleSavePaymentInfo() {
+  async handleSavePaymentInfo() {
     const key = document.getElementById('cfg-speedpesa-key').value.trim();
     if (!key) {
       alert("Tafadhali weka API Key!");
@@ -688,8 +678,17 @@ class SelvixApp {
     const settings = window.db.getSettings();
     settings.speedPesaApiKey = key;
     window.db.saveSettings(settings);
-    this.addNotification("Payment Info imehifadhiwa.");
-    alert("SpeedPesa API Key imehifadhiwa kikamilifu!");
+    
+    // Sync with backend API
+    try {
+      await window.api.updateSettings(key);
+      this.addNotification("Payment Info imehifadhiwa na kusawazishwa kwenye Seva.");
+      alert("SpeedPesa API Key imehifadhiwa kikamilifu kwenye Seva!");
+    } catch (e) {
+      this.addNotification("Error: " + e.message);
+      alert("Fail: " + e.message);
+    }
+    
     this.render();
   }
 
@@ -758,7 +757,7 @@ class SelvixApp {
 
         <!-- Footnote -->
         <div class="absolute bottom-8 left-0 right-0 text-[10px] text-indigo-300 font-bold uppercase tracking-widest">
-          Secured by Appwrite Cloud
+          Secured by cPanel Backend
         </div>
       </div>
     `;
@@ -1324,25 +1323,6 @@ class SelvixApp {
             </div>
           </div>
 
-          <!-- Appwrite System Configurator (Unique feature for porting verification) -->
-          <div class="glass-panel p-6 rounded-3xl border border-pink-900 bg-gradient-to-br from-gray-900 to-pink-950">
-            <h3 class="font-bold text-white text-sm uppercase mb-2 text-glow-magenta"><i class="fa-solid fa-database mr-2"></i>SUPABASE INTEGRATION PANEL</h3>
-            <p class="text-xs text-gray-400 mb-4">Weka maelezo ya URL na Anon Key yako ya Supabase ili kusawazisha Database ya Selvix na Wingu!</p>
-            <div class="space-y-3">
-              <div>
-                <label class="block text-[10px] uppercase text-cyan-400 font-bold mb-1">Supabase URL</label>
-                <input type="text" id="cfg-endpoint" value="${window.appwrite.config.supabaseUrl}" class="w-full p-2.5 rounded-lg cyber-input text-white text-xs" />
-              </div>
-              <div>
-                <label class="block text-[10px] uppercase text-cyan-400 font-bold mb-1">Supabase Anon Key</label>
-                <input type="text" id="cfg-project" value="${window.appwrite.config.supabaseKey}" placeholder="eyJhb..." class="w-full p-2.5 rounded-lg cyber-input text-white text-xs" />
-              </div>
-              <button data-action="save-appwrite" 
-                      class="w-full py-3 rounded-xl bg-pink-600 hover:bg-pink-700 text-white font-bold uppercase tracking-wider text-xs shadow-glow-magenta interactive-target">
-                Unganisha Wingu la Supabase
-              </button>
-            </div>
-          </div>
 
           <!-- Payment Integration System Configurator -->
           <div class="glass-panel p-6 rounded-3xl border border-green-900 bg-gradient-to-br from-gray-900 to-green-950 mt-6">
