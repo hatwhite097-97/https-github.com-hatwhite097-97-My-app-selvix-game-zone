@@ -29,17 +29,17 @@ body.theme-light {
 }
 
 body.theme-orange {
-  --neon-cyan: #1e3a8a;
-  --neon-magenta: #ff6b00;
-  --dark-bg: #120000; /* Dark deep red/black for the maroon store style, or deep orange/navy */
-  --card-bg: rgba(28, 12, 12, 0.75);
-  --glass-border: rgba(255, 107, 0, 0.2);
-  --text-color: #ffffff;
-  --text-muted: #cbd5e1;
-  --header-bg: rgba(18, 0, 0, 0.85);
-  --accent-color: #ff6b00;
-  --btn-grad-start: #3b82f6;
-  --btn-grad-end: #ff6b00;
+  --neon-cyan: #ff7300;
+  --neon-magenta: #ff5100;
+  --dark-bg: #faf7f2; /* Pure luxury off-white ivory background */
+  --card-bg: rgba(255, 255, 255, 0.95); /* Clean white cards */
+  --glass-border: rgba(255, 115, 0, 0.15); /* Delicate orange-tint border */
+  --text-color: #1a1510; /* Very deep charcoal/brown luxury text */
+  --text-muted: #6e645a; /* Smooth warm muted text */
+  --header-bg: rgba(255, 255, 255, 0.85); /* Pristine blurry header */
+  --accent-color: #ff5100; /* Rich luxury metallic orange */
+  --btn-grad-start: #ff8c00; /* Luxury gold-orange */
+  --btn-grad-end: #ff3c00; /* Deep luxurious sunset orange */
 }
 
 body {
@@ -98,8 +98,74 @@ body.theme-light nav.glass-panel {
 
 body.theme-orange {
   background-image: 
-    radial-gradient(circle at 10% 20%, rgba(59, 130, 246, 0.08) 0%, transparent 40%),
-    radial-gradient(circle at 90% 80%, rgba(255, 107, 0, 0.08) 0%, transparent 40%);
+    radial-gradient(circle at 15% 15%, rgba(255, 115, 0, 0.07) 0%, transparent 45%),
+    radial-gradient(circle at 85% 85%, rgba(255, 60, 0, 0.05) 0%, transparent 50%),
+    linear-gradient(135deg, #fffcf9 0%, #faf5ee 100%) !important;
+}
+
+body.theme-orange .text-white,
+body.theme-orange h1,
+body.theme-orange h2,
+body.theme-orange h3,
+body.theme-orange h4 {
+  color: #1a1510 !important;
+}
+
+body.theme-orange .text-gray-400,
+body.theme-orange .text-gray-300,
+body.theme-orange .text-gray-200,
+body.theme-orange p {
+  color: #6e645a !important;
+}
+
+body.theme-orange .text-cyan-400 {
+  color: #ff5100 !important;
+}
+
+body.theme-orange .text-pink-500 {
+  color: #ff3c00 !important;
+}
+
+body.theme-orange .glass-panel {
+  background: rgba(255, 255, 255, 0.95) !important;
+  border-color: rgba(255, 115, 0, 0.12) !important;
+  box-shadow: 0 4px 20px rgba(255, 115, 0, 0.08) !important;
+}
+
+body.theme-orange header.glass-panel,
+body.theme-orange nav.glass-panel {
+  background: rgba(255, 255, 255, 0.92) !important;
+  border-color: rgba(255, 115, 0, 0.1) !important;
+}
+
+body.theme-orange .cyber-input {
+  background: rgba(255, 255, 255, 0.95) !important;
+  border: 1px solid rgba(255, 115, 0, 0.2) !important;
+  color: #1a1510 !important;
+}
+
+body.theme-light .bg-gray-800 {
+  background-color: rgba(0, 0, 0, 0.04) !important;
+  color: #0f172a !important;
+}
+body.theme-light .bg-gray-900 {
+  background-color: rgba(0, 0, 0, 0.06) !important;
+  color: #0f172a !important;
+}
+body.theme-light .border-gray-700 {
+  border-color: rgba(0, 0, 0, 0.08) !important;
+}
+
+body.theme-orange .bg-gray-800 {
+  background-color: rgba(255, 115, 0, 0.04) !important;
+  color: #1a1510 !important;
+}
+body.theme-orange .bg-gray-900 {
+  background-color: rgba(255, 115, 0, 0.06) !important;
+  color: #1a1510 !important;
+}
+body.theme-orange .border-gray-700 {
+  border-color: rgba(255, 115, 0, 0.1) !important;
 }
 
 /* Glassmorphism Classes */

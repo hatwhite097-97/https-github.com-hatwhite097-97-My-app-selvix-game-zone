@@ -608,15 +608,17 @@ class SelvixApp {
   handleSaveAppwriteConfig() {
     const end = document.getElementById('cfg-endpoint').value.trim();
     const proj = document.getElementById('cfg-project').value.trim();
+    const dbId = document.getElementById('cfg-dbid').value.trim();
 
-    if (!proj || !end) {
-      alert("Tafadhali weka Supabase URL na Anon Key!");
+    if (!proj) {
+      alert("Tafadhali weka Project ID angalau!");
       return;
     }
 
     window.appwrite.updateConfig({
-      url: end,
-      anon_key: proj
+      endpoint: end || 'https://cloud.appwrite.io/v1',
+      projectId: proj,
+      databaseId: dbId || 'selvix_db'
     });
   }
 
@@ -1213,6 +1215,32 @@ class SelvixApp {
             </button>
           </div>
 
+          <!-- Manage Games List -->
+          <div class="glass-panel p-6 rounded-3xl">
+            <h3 class="font-bold text-white text-sm uppercase mb-4 text-glow-cyan"><i class="fa-solid fa-gamepad mr-2"></i>MICHEZO ILIYOPANDISHWA (${games.length})</h3>
+            ${games.length === 0 ? `
+              <p class="text-xs text-gray-400 text-center py-4">Hakuna michezo iliyopandishwa kwa sasa!</p>
+            ` : `
+              <div class="space-y-3 max-h-80 overflow-y-auto">
+                ${games.map(g => `
+                  <div class="p-3 bg-gray-800 bg-opacity-40 rounded-xl border border-gray-700 flex items-center justify-between">
+                    <div class="flex items-center space-x-3">
+                      <img src="${g.imageUrl}" alt="${g.title}" class="w-12 h-12 object-cover rounded-lg border border-gray-600" onerror="this.src='https://images.unsplash.com/photo-1542751371-adc38448a05e?q=80&w=200'"/>
+                      <div>
+                        <p class="font-semibold text-white">${g.title}</p>
+                        <p class="text-xs text-gray-400 mt-0.5">${g.category} | <span class="text-yellow-400 font-bold">${g.price > 0 ? 'TZS ' + g.price : 'BURE'}</span></p>
+                      </div>
+                    </div>
+                    <button data-action="admin-delete-game" data-param="${g.id}" 
+                            class="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded-lg uppercase flex items-center gap-1">
+                      <i class="fa-solid fa-trash-can"></i> Futa
+                    </button>
+                  </div>
+                `).join('')}
+              </div>
+            `}
+          </div>
+
           <div class="glass-panel p-6 rounded-3xl">
             <h3 class="font-bold text-white text-sm uppercase mb-4 text-glow-cyan"><i class="fa-solid fa-users-gear mr-2"></i>USIMAMIZI WA WATUMIAJI (USERS)</h3>
             <div class="space-y-3 max-h-80 overflow-y-auto">
@@ -1231,20 +1259,24 @@ class SelvixApp {
           </div>
 
           <div class="glass-panel p-6 rounded-3xl border border-pink-900 bg-gradient-to-br from-gray-900 to-pink-950">
-            <h3 class="font-bold text-white text-sm uppercase mb-2 text-glow-magenta"><i class="fa-solid fa-database mr-2"></i>SUPABASE INTEGRATION PANEL</h3>
-            <p class="text-xs text-gray-400 mb-4">Weka maelezo ya URL na Anon Key yako ya Supabase ili kusawazisha Database ya Selvix na Wingu!</p>
+            <h3 class="font-bold text-white text-sm uppercase mb-2 text-glow-magenta"><i class="fa-solid fa-database mr-2"></i>APPWRITE DATABASE INTEGRATION PANEL</h3>
+            <p class="text-xs text-gray-400 mb-4">Weka maelezo ya endpoint na Project ID yako ya Appwrite ili kusawazisha Database ya Selvix na Wingu!</p>
             <div class="space-y-3">
               <div>
-                <label class="block text-[10px] uppercase text-cyan-400 font-bold mb-1">Supabase URL</label>
-                <input type="text" id="cfg-endpoint" value="${window.appwrite.config.supabaseUrl}" class="w-full p-2.5 rounded-lg cyber-input text-white text-xs" />
+                <label class="block text-[10px] uppercase text-cyan-400 font-bold mb-1">Appwrite Endpoint</label>
+                <input type="text" id="cfg-endpoint" value="${window.appwrite.config.endpoint}" class="w-full p-2.5 rounded-lg cyber-input text-white text-xs" />
               </div>
               <div>
-                <label class="block text-[10px] uppercase text-cyan-400 font-bold mb-1">Supabase Anon Key</label>
-                <input type="text" id="cfg-project" value="${window.appwrite.config.supabaseKey}" placeholder="eyJhb..." class="w-full p-2.5 rounded-lg cyber-input text-white text-xs" />
+                <label class="block text-[10px] uppercase text-cyan-400 font-bold mb-1">Appwrite Project ID</label>
+                <input type="text" id="cfg-project" value="${window.appwrite.config.projectId}" placeholder="Mf: 66a93b4e00192e4c9e83" class="w-full p-2.5 rounded-lg cyber-input text-white text-xs" />
+              </div>
+              <div>
+                <label class="block text-[10px] uppercase text-cyan-400 font-bold mb-1">Database ID</label>
+                <input type="text" id="cfg-dbid" value="${window.appwrite.config.databaseId}" class="w-full p-2.5 rounded-lg cyber-input text-white text-xs" />
               </div>
               <button data-action="save-appwrite" 
                       class="w-full py-3 rounded-xl bg-pink-600 hover:bg-pink-700 text-white font-bold uppercase tracking-wider text-xs shadow-glow-magenta interactive-target">
-                Unganisha Wingu la Supabase
+                Unganisha Wingu la Appwrite
               </button>
             </div>
           </div>

@@ -59,8 +59,6 @@ const DEFAULT_SETTINGS = {
 class SelvixDatabase {
   constructor() {
     this.init();
-    // Fire background sync if api is available
-    setTimeout(() => this.syncRemote(), 50);
   }
 
   init() {
@@ -97,87 +95,6 @@ class SelvixDatabase {
     }
   }
 
-  async syncRemote() {
-    if (!window.api) return;
-    const current = this.getCurrentUser();
-    const serverState = await window.api.syncState(current ? current.username : null);
-    
-    if (serverState) {
-      // Overwrite local state with fresh server state
-      if (serverState.games && serverState.games.length > 0) {
-        // Map backend snake_case to frontend camelCase for Games
-        const parsedGames = serverState.games.map(g => ({
-          id: parseInt(g.id),
-          title: g.title,
-          imageUrl: g.image_url,
-          category: g.category,
-          isPaid: g.is_paid == 1,
-          price: parseFloat(g.price),
-          downloadUrl: g.download_url,
-          description: g.description
-        }));
-        localStorage.setItem('selvix_games', JSON.stringify(parsedGames));
-      }
-
-      if (serverState.chats && serverState.chats.length > 0) {
-        const parsedChats = serverState.chats.map(c => ({
-          id: parseInt(c.id),
-          senderUsername: c.sender_username,
-          senderFullName: c.sender_full_name,
-          message: c.message,
-          isSocial: c.is_social == 1,
-          timestamp: new Date(c.created_at).toLocaleString()
-        }));
-        localStorage.setItem('selvix_chats', JSON.stringify(parsedChats));
-      }
-
-      if (serverState.settings) {
-        const set = serverState.settings;
-        localStorage.setItem('selvix_settings', JSON.stringify({
-          isReferralActive: set.is_referral_active == 1,
-          isWithdrawalActive: set.is_withdrawal_active == 1,
-          isSocialChatClosed: set.is_social_chat_closed == 1,
-          isAdminChatClosed: set.is_admin_chat_closed == 1,
-          speedPesaApiKey: set.speedpesa_api_key
-        }));
-      }
-
-      if (serverState.users && serverState.users.length > 0) {
-        const userMap = {};
-        serverState.users.forEach(u => {
-          userMap[u.username.toLowerCase()] = {
-            username: u.username,
-            fullName: u.full_name,
-            phoneNumber: u.phone_number,
-            isAdmin: u.is_admin == 1,
-            isBlockedFromChatting: u.is_blocked_from_chatting == 1,
-            pointsBalance: parseFloat(u.points_balance),
-            streakCount: parseInt(u.streak_count),
-            lastRewardClaimedDate: u.last_reward_claimed_date,
-            referredBy: u.referred_by
-          };
-        });
-        localStorage.setItem('selvix_users', JSON.stringify(userMap));
-        
-        if (current && userMap[current.username.toLowerCase()]) {
-            this.setCurrentUser(userMap[current.username.toLowerCase()]);
-        }
-      }
-
-      if (serverState.transactions && serverState.transactions.length > 0) {
-        const txs = serverState.transactions.map(t => ({
-          reference: t.reference,
-          status: t.status,
-          amount: parseFloat(t.amount),
-          username: t.username,
-          gameId: t.game_id,
-          created: new Date(t.created_at).toLocaleString()
-        }));
-        localStorage.setItem('selvix_transactions', JSON.stringify(txs));
-      }
-    }
-  }
-
   // --- Users ---
   getUsers() {
     return JSON.parse(localStorage.getItem('selvix_users')) || {};
@@ -192,11 +109,11 @@ class SelvixDatabase {
     const users = this.getUsers();
     users[user.username.trim().toLowerCase()] = user;
     localStorage.setItem('selvix_users', JSON.stringify(users));
-    if (window.api) window.api.syncMutation('update_user', user);
   }
 
   updateUser(user) {
     this.saveUser(user);
+    // Sync current session if this is the active user
     const current = this.getCurrentUser();
     if (current && current.username.toLowerCase() === user.username.toLowerCase()) {
       this.setCurrentUser(user);
@@ -229,7 +146,6 @@ class SelvixDatabase {
     game.id = games.length > 0 ? Math.max(...games.map(g => g.id)) + 1 : 1;
     games.push(game);
     localStorage.setItem('selvix_games', JSON.stringify(games));
-    if (window.api) window.api.syncMutation('insert_game', game);
     return game;
   }
 
@@ -237,7 +153,6 @@ class SelvixDatabase {
     let games = this.getGames();
     games = games.filter(g => g.id !== parseInt(id));
     localStorage.setItem('selvix_games', JSON.stringify(games));
-    if (window.api) window.api.syncMutation('delete_game', { id });
   }
 
   // --- Chats ---
@@ -251,7 +166,6 @@ class SelvixDatabase {
     chat.timestamp = new Date().toLocaleString();
     chats.push(chat);
     localStorage.setItem('selvix_chats', JSON.stringify(chats));
-    if (window.api) window.api.syncMutation('insert_chat', chat);
     return chat;
   }
 
@@ -259,7 +173,6 @@ class SelvixDatabase {
     let chats = this.getChats();
     chats = chats.filter(c => c.id !== parseInt(id));
     localStorage.setItem('selvix_chats', JSON.stringify(chats));
-    if (window.api) window.api.syncMutation('delete_chat', { id });
   }
 
   // --- Settings ---
@@ -269,7 +182,6 @@ class SelvixDatabase {
 
   saveSettings(settings) {
     localStorage.setItem('selvix_settings', JSON.stringify(settings));
-    if (window.api) window.api.syncMutation('update_settings', settings);
   }
 
   getActiveTheme() {
@@ -290,7 +202,6 @@ class SelvixDatabase {
     tx.created = new Date().toLocaleString();
     txs.push(tx);
     localStorage.setItem('selvix_transactions', JSON.stringify(txs));
-    if (window.api) window.api.syncMutation('insert_transaction', tx);
     return tx;
   }
 
@@ -300,7 +211,6 @@ class SelvixDatabase {
     if (tx) {
       tx.status = status;
       localStorage.setItem('selvix_transactions', JSON.stringify(txs));
-      if (window.api) window.api.syncMutation('update_transaction', { reference, status });
     }
   }
 

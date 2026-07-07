@@ -109,13 +109,14 @@ class SelvixApp {
       case 'claim-reward':
         this.handleClaimReward();
         break;
-      case 'buy-coins':
-      case 'buy-coins':
-      case 'buy-speedpesa':
-        this.handleBuyWithSpeedPesa();
-        break;
       case 'send-chat':
         this.handleSendChat();
+        break;
+      case 'buy-coins':
+        this.handleBuyWithCoins();
+        break;
+      case 'buy-speedpesa':
+        this.handleBuyWithSpeedPesa();
         break;
       case 'request-withdrawal':
         this.handleWithdrawalRequest();
@@ -149,9 +150,6 @@ class SelvixApp {
         break;
       case 'save-appwrite':
         this.handleSaveAppwriteConfig();
-        break;
-      case 'save-payment-info':
-        this.handleSavePaymentInfo();
         break;
     }
   }
@@ -191,7 +189,15 @@ class SelvixApp {
   }
 
   async handleGoogleLogin() {
-    alert("Google Sign-In inahitaji usanidi zaidi kwenye cPanel. Kwa sasa tumia fomu ya kawaida ya kujiandikisha au kuingia.");
+    if (window.appwrite.isActive) {
+      try {
+        await window.appwrite.loginWithGoogle();
+      } catch (err) {
+        alert("Google Sign-In imefeli: " + err.message);
+      }
+    } else {
+      alert("Ili kucheza na kuingia kwa kutumia Google, lazima uunganishe na uweke maelezo ya akaunti yako ya Appwrite. Unaweza kuomba nikuwekee kwa kunipatia Project ID na Endpoint kwenye soga ya AI Studio!");
+    }
   }
 
   // --- Auth Handlers ---
@@ -329,13 +335,12 @@ class SelvixApp {
     const game = this.selectedGame;
     if (!user || !game) return;
 
-    const currentBalance = parseFloat(user.pointsBalance || 0);
-    if (currentBalance < game.price) {
-      alert("Coins hazitoshi! Unahitaji TZS " + game.price + " ila una TZS " + currentBalance + ".");
+    if (user.pointsBalance < game.price) {
+      alert("Coins hazitoshi! Unahitaji TZS " + game.price + " ila una TZS " + user.pointsBalance + ".");
       return;
     }
 
-    user.pointsBalance = currentBalance - game.price;
+    user.pointsBalance -= game.price;
     window.db.updateUser(user);
 
     // Record successful transaction
@@ -353,7 +358,7 @@ class SelvixApp {
     this.showView('user-home');
   }
 
-  async handleBuyWithSpeedPesa() {
+  handleBuyWithSpeedPesa() {
     const user = window.db.getCurrentUser();
     const game = this.selectedGame;
     if (!user || !game) return;
@@ -376,93 +381,50 @@ class SelvixApp {
       status: "PENDING"
     });
 
-    // Start payment polling workflow
+    // Start payment simulation workflow
     this.paymentProgress = "Inatuma ombi la malipo SpeedPesa (Reference: " + ref + ")...";
     this.paymentStatus = "PENDING";
     this.renderPaymentProgressModal();
 
-    try {
-      await window.appwrite.callPaymentFunction('speedpesa-integration', {
-        action: 'REQUEST_PAYMENT',
-        phonenumber: "255" + phone,
-        amount: game.price,
-        reference: ref
-      });
-
+    setTimeout(() => {
       this.paymentProgress = "Ombi limepokelewa. Hakiki namba yako ya siri ya simu ili kuthibitisha malipo ya TZS " + game.price + "...";
       this.renderPaymentProgressModal();
 
-      let pollCount = 0;
-      const pollInterval = setInterval(async () => {
-        pollCount++;
-        // Timeout after 60 seconds (20 polls)
-        if (pollCount > 20) {
-          clearInterval(pollInterval);
-          this.paymentProgress = "Muda wa malipo umeisha. Tafadhali jaribu tena.";
-          this.paymentStatus = "FAILED";
-          window.db.updateTransactionStatus(ref, "FAILED");
-          this.renderPaymentProgressModal();
-          setTimeout(() => this.closePaymentProgressModal(), 3000);
-          return;
-        }
+      setTimeout(() => {
+        // Mock successful verify
+        this.paymentProgress = "Ujumbe kutoka SpeedPesa: Malipo ya TZS " + game.price + " yamehakikishwa! Inapakua sasa...";
+        this.paymentStatus = "SUCCESS";
+        this.renderPaymentProgressModal();
 
-        try {
-          const statusRes = await window.appwrite.callPaymentFunction('speedpesa-integration', {
-            action: 'CHECK_STATUS',
-            reference: ref
-          });
+        window.db.updateTransactionStatus(ref, "SUCCESS");
 
-          if (statusRes.success && statusRes.status === 'SUCCESS') {
-            clearInterval(pollInterval);
-            this.paymentProgress = "Ujumbe kutoka SpeedPesa: Malipo yamehakikishwa! Inapakua sasa...";
-            this.paymentStatus = "SUCCESS";
-            this.renderPaymentProgressModal();
-
-            window.db.updateTransactionStatus(ref, "SUCCESS");
-
-            // Credit referral bonus if applicable
-            if (game.price >= 5000.0 && user.referredBy) {
-              const referrer = window.db.getUser(user.referredBy);
-              if (referrer) {
-                referrer.pointsBalance = (referrer.pointsBalance || 0) + 100.0;
-                window.db.saveUser(referrer);
-                window.db.insertTransaction({
-                  reference: "REF-BONUS-" + Date.now(),
-                  username: referrer.username,
-                  gameId: -2, // referral bonus indicator
-                  phonenumber: referrer.phoneNumber,
-                  amount: 100.0,
-                  status: "SUCCESS"
-                });
-              }
-            }
-
-            setTimeout(() => {
-              this.closePaymentProgressModal();
-              this.addNotification("Malipo ya " + game.title + " yamekamilika kwa ufanisi!");
-              alert("Hongera! Malipo yako ya SpeedPesa yamehakikishwa. Download yako inaunganishwa sasa.");
-              this.showView('user-home');
-            }, 2000);
-          } else if (statusRes.success && statusRes.status === 'FAILED') {
-            clearInterval(pollInterval);
-            this.paymentProgress = "Muamala umeshindwa (FAILED).";
-            this.paymentStatus = "FAILED";
-            window.db.updateTransactionStatus(ref, "FAILED");
-            this.renderPaymentProgressModal();
-            setTimeout(() => this.closePaymentProgressModal(), 3000);
+        // Credit referral bonus if applicable
+        if (game.price >= 5000.0 && user.referredBy) {
+          const referrer = window.db.getUser(user.referredBy);
+          if (referrer) {
+            referrer.pointsBalance = (referrer.pointsBalance || 0) + 100.0;
+            window.db.saveUser(referrer);
+            window.db.insertTransaction({
+              reference: "REF-BONUS-" + Date.now(),
+              username: referrer.username,
+              gameId: -2, // referral bonus indicator
+              phonenumber: referrer.phoneNumber,
+              amount: 100.0,
+              status: "SUCCESS"
+            });
           }
-        } catch (pollErr) {
-          console.warn("Status polling error:", pollErr);
         }
-      }, 3000);
 
-    } catch (error) {
-      this.paymentProgress = "Hitilafu imetokea: " + error.message;
-      this.paymentStatus = "FAILED";
-      window.db.updateTransactionStatus(ref, "FAILED");
-      this.renderPaymentProgressModal();
-      setTimeout(() => this.closePaymentProgressModal(), 3000);
-    }
+        setTimeout(() => {
+          this.closePaymentProgressModal();
+          this.addNotification("Malipo ya " + game.title + " yamekamilika kwa ufanisi!");
+          alert("Hongera! Malipo yako ya SpeedPesa yamehakikishwa. Download yako inaunganishwa sasa.");
+          this.showView('user-home');
+        }, 2000);
+
+      }, 3500);
+
+    }, 2000);
   }
 
   // --- Withdrawal Handlers ---
@@ -654,42 +616,22 @@ class SelvixApp {
     this.render();
   }
 
-  // --- API Configuration Save ---
+  // --- Appwrite Configuration Save ---
   handleSaveAppwriteConfig() {
     const end = document.getElementById('cfg-endpoint').value.trim();
+    const proj = document.getElementById('cfg-project').value.trim();
+    const dbId = document.getElementById('cfg-dbid').value.trim();
 
-    if (!end) {
-      alert("Tafadhali weka API Endpoint URL yako!");
+    if (!proj) {
+      alert("Tafadhali weka Project ID angalau!");
       return;
     }
 
-    window.api.updateConfig({
-      url: end
+    window.appwrite.updateConfig({
+      endpoint: end || 'https://cloud.appwrite.io/v1',
+      projectId: proj,
+      databaseId: dbId || 'selvix_db'
     });
-  }
-
-  // --- Payment Info Config Save ---
-  async handleSavePaymentInfo() {
-    const key = document.getElementById('cfg-speedpesa-key').value.trim();
-    if (!key) {
-      alert("Tafadhali weka API Key!");
-      return;
-    }
-    const settings = window.db.getSettings();
-    settings.speedPesaApiKey = key;
-    window.db.saveSettings(settings);
-    
-    // Sync with backend API
-    try {
-      await window.api.updateSettings(key);
-      this.addNotification("Payment Info imehifadhiwa na kusawazishwa kwenye Seva.");
-      alert("SpeedPesa API Key imehifadhiwa kikamilifu kwenye Seva!");
-    } catch (e) {
-      this.addNotification("Error: " + e.message);
-      alert("Fail: " + e.message);
-    }
-    
-    this.render();
   }
 
   // --- RENDERING VIEWS ---
@@ -715,8 +657,6 @@ class SelvixApp {
       root.innerHTML = this.getGameDetailsHTML();
     } else if (this.currentView === 'admin-dashboard') {
       root.innerHTML = this.getAdminDashboardHTML();
-    } else if (this.currentView === 'admin-transactions') {
-      root.innerHTML = this.getAdminTransactionsHTML();
     }
   }
 
@@ -757,7 +697,7 @@ class SelvixApp {
 
         <!-- Footnote -->
         <div class="absolute bottom-8 left-0 right-0 text-[10px] text-indigo-300 font-bold uppercase tracking-widest">
-          Secured by cPanel Backend
+          Secured by Appwrite Cloud
         </div>
       </div>
     `;
@@ -1071,7 +1011,7 @@ class SelvixApp {
           </div>
           
           <div class="flex justify-between items-center text-xs">
-            <span class="text-gray-400">Salio: <strong class="text-yellow-400">TZS ${(user.pointsBalance || 0).toFixed(0)}</strong></span>
+            <span class="text-gray-400">Salio: <strong class="text-yellow-400">TZS ${user.pointsBalance.toFixed(0)}</strong></span>
             
             <div data-action="logout" class="flex items-center text-gray-400 hover:text-white cursor-pointer font-bold gap-1">
               <i class="fa-solid fa-right-from-bracket text-[10px]"></i> Toka
@@ -1305,6 +1245,32 @@ class SelvixApp {
             </button>
           </div>
 
+          <!-- Manage Games List -->
+          <div class="glass-panel p-6 rounded-3xl">
+            <h3 class="font-bold text-white text-sm uppercase mb-4 text-glow-cyan"><i class="fa-solid fa-gamepad mr-2"></i>MICHEZO ILIYOPANDISHWA (${games.length})</h3>
+            ${games.length === 0 ? `
+              <p class="text-xs text-gray-400 text-center py-4">Hakuna michezo iliyopandishwa kwa sasa!</p>
+            ` : `
+              <div class="space-y-3 max-h-80 overflow-y-auto">
+                ${games.map(g => `
+                  <div class="p-3 bg-gray-800 bg-opacity-40 rounded-xl border border-gray-700 flex items-center justify-between">
+                    <div class="flex items-center space-x-3">
+                      <img src="${g.imageUrl}" alt="${g.title}" class="w-12 h-12 object-cover rounded-lg border border-gray-600" onerror="this.src='https://images.unsplash.com/photo-1542751371-adc38448a05e?q=80&w=200'"/>
+                      <div>
+                        <p class="font-semibold text-white">${g.title}</p>
+                        <p class="text-xs text-gray-400 mt-0.5">${g.category} | <span class="text-yellow-400 font-bold">${g.price > 0 ? 'TZS ' + g.price : 'BURE'}</span></p>
+                      </div>
+                    </div>
+                    <button data-action="admin-delete-game" data-param="${g.id}" 
+                            class="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded-lg uppercase flex items-center gap-1">
+                      <i class="fa-solid fa-trash-can"></i> Futa
+                    </button>
+                  </div>
+                `).join('')}
+              </div>
+            `}
+          </div>
+
           <!-- Users Management -->
           <div class="glass-panel p-6 rounded-3xl">
             <h3 class="font-bold text-white text-sm uppercase mb-4 text-glow-cyan"><i class="fa-solid fa-users-gear mr-2"></i>USIMAMIZI WA WATUMIAJI (USERS)</h3>
@@ -1323,88 +1289,34 @@ class SelvixApp {
             </div>
           </div>
 
-
-          <!-- Payment Integration System Configurator -->
-          <div class="glass-panel p-6 rounded-3xl border border-green-900 bg-gradient-to-br from-gray-900 to-green-950 mt-6">
-            <h3 class="font-bold text-white text-sm uppercase mb-2 text-glow-cyan"><i class="fa-solid fa-money-bill-wave mr-2"></i>SPEEDPESA PAYMENT INTEGRATION</h3>
-            <p class="text-xs text-gray-400 mb-4">Weka API Key yako ya SpeedPesa hapa badala ya kui-hardcode kwenye source code.</p>
+          <!-- Appwrite System Configurator (Unique feature for porting verification) -->
+          <div class="glass-panel p-6 rounded-3xl border border-pink-900 bg-gradient-to-br from-gray-900 to-pink-950">
+            <h3 class="font-bold text-white text-sm uppercase mb-2 text-glow-magenta"><i class="fa-solid fa-database mr-2"></i>APPWRITE DATABASE INTEGRATION PANEL</h3>
+            <p class="text-xs text-gray-400 mb-4">Weka maelezo ya endpoint na Project ID yako ya Appwrite ili kusawazisha Database ya Selvix na Wingu!</p>
             <div class="space-y-3">
               <div>
-                <label class="block text-[10px] uppercase text-green-400 font-bold mb-1">SpeedPesa API Key</label>
-                <input type="text" id="cfg-speedpesa-key" value="${settings.speedPesaApiKey || ''}" placeholder="Weka API Key hapa..." class="w-full p-2.5 rounded-lg cyber-input text-white text-xs" />
+                <label class="block text-[10px] uppercase text-cyan-400 font-bold mb-1">Appwrite Endpoint</label>
+                <input type="text" id="cfg-endpoint" value="${window.appwrite.config.endpoint}" class="w-full p-2.5 rounded-lg cyber-input text-white text-xs" />
               </div>
-              <button data-action="save-payment-info" 
-                      class="w-full py-3 rounded-xl bg-green-600 hover:bg-green-700 text-white font-bold uppercase tracking-wider text-xs shadow-glow-cyan interactive-target">
-                Hifadhi Payment Info
+              <div>
+                <label class="block text-[10px] uppercase text-cyan-400 font-bold mb-1">Appwrite Project ID</label>
+                <input type="text" id="cfg-project" value="${window.appwrite.config.projectId}" placeholder="Mf: 66a93b4e00192e4c9e83" class="w-full p-2.5 rounded-lg cyber-input text-white text-xs" />
+              </div>
+              <div>
+                <label class="block text-[10px] uppercase text-cyan-400 font-bold mb-1">Database ID</label>
+                <input type="text" id="cfg-dbid" value="${window.appwrite.config.databaseId}" class="w-full p-2.5 rounded-lg cyber-input text-white text-xs" />
+              </div>
+              <button data-action="save-appwrite" 
+                      class="w-full py-3 rounded-xl bg-pink-600 hover:bg-pink-700 text-white font-bold uppercase tracking-wider text-xs shadow-glow-magenta interactive-target">
+                Unganisha Wingu la Appwrite
               </button>
             </div>
           </div>
 
-          <button data-action="nav" data-param="admin-transactions" 
-                  class="w-full py-4 rounded-xl bg-gradient-to-r from-blue-500 to-indigo-600 hover:opacity-90 text-white font-bold tracking-widest uppercase shadow-glow-cyan interactive-target mt-6">
-            <i class="fa-solid fa-list-check mr-2"></i> Tazama Miamala Yote (Transactions & Issues)
-          </button>
-
           <button data-action="nav" data-param="user-home" 
-                  class="w-full py-4 rounded-xl bg-gray-800 hover:bg-gray-700 text-white font-bold uppercase tracking-wider text-xs border border-gray-700 mt-4">
+                  class="w-full py-4 rounded-xl bg-gray-800 hover:bg-gray-700 text-white font-bold uppercase tracking-wider text-xs border border-gray-700">
             Fungua upande wa User (User Interface)
           </button>
-        </div>
-      </div>
-    `;
-  }
-
-  getAdminTransactionsHTML() {
-    const txs = window.db.getTransactions().reverse(); // Show newest first
-    return `
-      <div class="min-h-screen flex flex-col pb-6 fade-in text-sm">
-        <header class="glass-panel px-6 py-4 flex items-center justify-between border-b border-gray-800">
-          <div class="flex items-center space-x-3">
-            <button data-action="nav" data-param="admin-dashboard" class="w-10 h-10 rounded-2xl bg-white bg-opacity-10 hover:bg-opacity-20 flex items-center justify-center border border-white border-opacity-10 transition">
-              <i class="fa-solid fa-arrow-left text-white text-base"></i>
-            </button>
-            <div>
-              <h1 class="text-lg font-bold text-white uppercase text-glow-cyan">All Transactions</h1>
-              <p class="text-xs text-cyan-400 font-semibold uppercase">Payment Issues Tracker</p>
-            </div>
-          </div>
-        </header>
-        
-        <div class="p-6 space-y-4">
-          <div class="glass-panel p-6 rounded-3xl">
-            <h3 class="font-bold text-white text-sm uppercase mb-4 text-glow-cyan"><i class="fa-solid fa-list mr-2"></i>Miamala (Transactions & Issues)</h3>
-            ${txs.length === 0 ? `
-              <p class="text-xs text-gray-500 text-center py-4">Hakuna miamala yoyote kwenye mfumo.</p>
-            ` : `
-              <div class="space-y-3">
-                ${txs.map(tx => {
-                  let statusBadge = '';
-                  let borderColor = 'border-gray-700';
-                  
-                  if (tx.status === 'SUCCESS') {
-                    statusBadge = '<span class="px-2 py-1 rounded text-[10px] font-bold uppercase bg-green-950 text-green-300 border border-green-800">SUCCESS</span>';
-                  } else if (tx.status === 'FAILED') {
-                    statusBadge = '<span class="px-2 py-1 rounded text-[10px] font-bold uppercase bg-red-950 text-red-300 border border-red-800">FAILED (ISSUE)</span>';
-                    borderColor = 'border-red-900';
-                  } else {
-                    statusBadge = '<span class="px-2 py-1 rounded text-[10px] font-bold uppercase bg-yellow-950 text-yellow-300 border border-yellow-800 animate-pulse">PENDING</span>';
-                    borderColor = 'border-yellow-900';
-                  }
-                  
-                  const txType = tx.gameId === -1 ? 'Withdrawal' : tx.gameId === -2 ? 'Referral Bonus' : 'Game Purchase';
-
-                  return '<div class="p-4 bg-gray-800 bg-opacity-60 rounded-2xl border ' + borderColor + ' flex flex-col md:flex-row md:items-center justify-between gap-4">' +
-                         '  <div>' +
-                         '    <p class="font-semibold text-white">Ref: ' + tx.reference + ' <span class="text-[10px] text-gray-400 ml-2">(' + txType + ')</span></p>' +
-                         '    <p class="text-xs text-gray-400 mt-1">Mtumiaji: <span class="font-bold text-cyan-400">@' + tx.username + '</span> | Namba: +' + tx.phonenumber + ' | Kiasi: <span class="font-bold text-yellow-400">TZS ' + tx.amount + '</span></p>' +
-                         '    <p class="text-[10px] text-gray-500 mt-1">Tarehe: ' + (tx.created || 'N/A') + '</p>' +
-                         '  </div>' +
-                         '  <div class="flex space-x-2">' + statusBadge + '</div>' +
-                         '</div>';
-                }).join('')}
-              </div>
-            `}
-          </div>
         </div>
       </div>
     `;
@@ -1599,7 +1511,7 @@ class SelvixApp {
         <div class="glass-panel p-6 rounded-3xl bg-gradient-to-br from-indigo-950 to-gray-900 border-indigo-900 flex items-center justify-between">
           <div>
             <p class="text-xs text-indigo-400 font-bold uppercase tracking-wider">Kiasi Kinachoweza Kutolewa</p>
-            <h2 class="text-3xl font-black text-yellow-400 text-glow-cyan mt-1">TZS ${(user.pointsBalance || 0).toFixed(0)}</h2>
+            <h2 class="text-3xl font-black text-yellow-400 text-glow-cyan mt-1">TZS ${user.pointsBalance.toFixed(0)}</h2>
             <p class="text-[10px] text-gray-400 mt-1">Sawa na Coins ${(user.pointsBalance || 0).toFixed(0)}</p>
           </div>
           <i class="fa-solid fa-wallet text-4xl text-indigo-500"></i>
