@@ -12,6 +12,13 @@ class SelvixApp {
     this.paymentProgress = "";
     this.paymentStatus = "";
 
+    // Extract & save referral parameter if present in the URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const refParam = urlParams.get('ref') || urlParams.get('referredBy');
+    if (refParam) {
+      localStorage.setItem('selvix_temp_ref', refParam.trim().toLowerCase());
+    }
+
     this.applyTheme();
     this.bindEvents();
     this.start();
@@ -147,6 +154,9 @@ class SelvixApp {
         break;
       case 'update-profile':
         this.handleUpdateProfile();
+        break;
+      case 'copy-referral-link':
+        this.handleCopyReferralLink();
         break;
       case 'save-appwrite':
         this.handleSaveAppwriteConfig();
@@ -616,6 +626,31 @@ class SelvixApp {
     this.render();
   }
 
+  handleCopyReferralLink() {
+    const user = window.db.getCurrentUser();
+    if (!user) return;
+    const refLink = `${window.location.origin}${window.location.pathname}?ref=${user.username}`;
+    
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(refLink)
+        .then(() => {
+          alert("Kiungo chako cha mwaliko kimenakiliwa: " + refLink);
+        })
+        .catch(err => {
+          alert("Imeshindwa kunakili: " + err.message);
+        });
+    } else {
+      // Fallback for older browsers or insecure contexts
+      const el = document.createElement('textarea');
+      el.value = refLink;
+      document.body.appendChild(el);
+      el.select();
+      document.execCommand('copy');
+      document.body.removeChild(el);
+      alert("Kiungo chako cha mwaliko kimenakiliwa: " + refLink);
+    }
+  }
+
   // --- Appwrite Configuration Save ---
   handleSaveAppwriteConfig() {
     const end = document.getElementById('cfg-endpoint').value.trim();
@@ -663,40 +698,32 @@ class SelvixApp {
   // --- HTML TEMPLATES ---
   getSplashHTML() {
     return `
-      <div class="min-h-screen bg-gradient-to-br from-[#5b0cb5] via-[#7313f3] to-[#3a0680] flex flex-col items-center justify-center p-6 text-center text-white relative overflow-hidden">
-        <!-- Floating neon blur elements -->
-        <div class="absolute w-64 h-64 bg-cyan-400 bg-opacity-20 rounded-full blur-3xl top-[-20%] left-[-20%] animate-pulse"></div>
-        <div class="absolute w-64 h-64 bg-pink-500 bg-opacity-20 rounded-full blur-3xl bottom-[-20%] right-[-20%] animate-pulse" style="animation-delay: 1s"></div>
+      <div class="min-h-screen bg-gradient-to-br from-[#0a0e1a] via-[#121829] to-[#070a14] flex flex-col items-center justify-center p-6 text-center text-white relative overflow-hidden">
+        <!-- Floating premium neon blur elements -->
+        <div class="absolute w-72 h-72 bg-[#ff5100] bg-opacity-20 rounded-full blur-3xl top-[-20%] left-[-20%] animate-pulse"></div>
+        <div class="absolute w-72 h-72 bg-[#ffa600] bg-opacity-15 rounded-full blur-3xl bottom-[-20%] right-[-20%] animate-pulse" style="animation-delay: 1s"></div>
         
-        <!-- Logo -->
-        <div class="mb-10 transform scale-125 animate-bounce" style="animation-duration: 2.5s">
-          <div class="flex items-center gap-1.5 justify-center">
-            <div class="flex gap-1">
-              <div class="w-3 h-12 bg-white transform -skew-x-12 rounded-sm shadow-lg"></div>
-              <div class="w-3 h-12 bg-white transform -skew-x-12 rounded-sm shadow-lg"></div>
-              <div class="w-3 h-12 bg-white transform -skew-x-12 rounded-sm shadow-lg"></div>
-            </div>
-            <div class="flex flex-col justify-between h-11 w-10 ml-0.5">
-              <div class="h-2.5 bg-white rounded-sm w-full shadow-lg"></div>
-              <div class="h-2.5 bg-white rounded-sm w-4/5 shadow-lg"></div>
-              <div class="h-2.5 bg-white rounded-sm w-full shadow-lg"></div>
-            </div>
-          </div>
-          <div class="text-white font-black text-sm tracking-widest mt-2 uppercase text-glow-cyan">MOBILE ESPORTS</div>
-          <div class="text-[9px] text-yellow-300 font-black tracking-widest mt-0.5 uppercase">SELVIX GAME ZONE</div>
+        <!-- Logo Image -->
+        <div class="mb-8 transform scale-110 flex flex-col items-center">
+          <img src="https://cdn.phototourl.com/member/2026-07-07-8d18e747-46e3-4af1-801d-7bcaca6b0870.png" 
+               alt="Selvix Logo" 
+               class="w-32 h-32 object-contain rounded-3xl shadow-xl border-2 border-[#ff5100] bg-[#161f38] p-2 animate-pulse" 
+               style="box-shadow: 0 10px 30px rgba(255, 115, 0, 0.25)"/>
+          <div class="text-[#ff5100] font-black text-sm tracking-widest mt-4 uppercase text-glow-cyan">MOBILE ESPORTS</div>
+          <div class="text-[10px] text-amber-500 font-extrabold tracking-widest mt-0.5 uppercase">SELVIX GAME ZONE</div>
         </div>
 
-        <h1 class="text-xl font-black text-white uppercase tracking-wider mb-2">Inapakia Mifumo...</h1>
-        <p class="text-xs text-indigo-200 mb-8 max-w-xs">Karibu kwenye jukwaa bora la kupakua michezo na kupata zawadi Tanzania!</p>
+        <h1 class="text-base font-black text-white uppercase tracking-wider mb-2">Inapakia Mifumo...</h1>
+        <p class="text-xs text-gray-400 mb-8 max-w-xs leading-relaxed">Karibu kwenye jukwaa bora la kupakua michezo na kupata zawadi Tanzania!</p>
 
         <!-- Modern glowing progress container -->
-        <div class="w-full max-w-xs bg-black bg-opacity-30 rounded-full p-1.5 border border-indigo-400 border-opacity-20 shadow-inner">
-          <div id="splash-progress" class="h-3 bg-gradient-to-r from-yellow-400 via-pink-500 to-cyan-400 rounded-full transition-all duration-100 ease-out shadow-glow-cyan" style="width: 0%"></div>
+        <div class="w-full max-w-xs bg-[#161f38] rounded-full p-1 border border-gray-800 shadow-inner">
+          <div id="splash-progress" class="h-2 bg-gradient-to-r from-[#ff8c00] via-[#ff5100] to-[#ff3c00] rounded-full transition-all duration-100 ease-out shadow-glow-cyan" style="width: 0%"></div>
         </div>
-        <div class="text-xs font-black text-yellow-300 mt-3 uppercase tracking-widest" id="splash-percentage">0%</div>
+        <div class="text-xs font-black text-[#ffa600] mt-3 uppercase tracking-widest" id="splash-percentage">0%</div>
 
         <!-- Footnote -->
-        <div class="absolute bottom-8 left-0 right-0 text-[10px] text-indigo-300 font-bold uppercase tracking-widest">
+        <div class="absolute bottom-8 left-0 right-0 text-[10px] text-gray-500 font-bold uppercase tracking-widest">
           Secured by Appwrite Cloud
         </div>
       </div>
@@ -705,131 +732,116 @@ class SelvixApp {
 
   getRegisterHTML() {
     return `
-      <div class="min-h-screen bg-gradient-to-br from-[#5b0cb5] via-[#7313f3] to-[#3a0680] flex flex-col p-6 fade-in text-white relative">
+      <div class="min-h-screen bg-gradient-to-br from-[#0a0e1a] via-[#121829] to-[#070a14] flex flex-col p-6 fade-in text-white relative">
         <!-- Top Navigation -->
         <div class="flex items-center justify-between mb-6">
           <button data-action="nav" data-param="login" 
-                  class="w-10 h-10 rounded-2xl bg-white bg-opacity-10 hover:bg-opacity-20 flex items-center justify-center border border-white border-opacity-10 transition">
-            <i class="fa-solid fa-arrow-left text-white text-base"></i>
+                  class="w-10 h-10 rounded-2xl bg-[#161f38] hover:bg-[#1f2b4e] flex items-center justify-center border border-gray-800 transition shadow-md">
+            <i class="fa-solid fa-arrow-left text-[#ff5100] text-base"></i>
           </button>
-          <div class="text-[10px] font-black bg-white bg-opacity-10 px-3 py-1.5 rounded-full uppercase tracking-wider border border-white border-opacity-10">
+          <div class="text-[10px] font-black bg-[#161f38] px-3.5 py-2 rounded-full uppercase tracking-wider border border-gray-800 shadow-sm text-amber-500">
             Sajili Akaunti
           </div>
         </div>
 
         <!-- Logo -->
         <div class="flex flex-col items-center mb-4">
-          <div class="flex items-center gap-1.5 justify-center">
-            <div class="flex gap-1">
-              <div class="w-2.5 h-10 bg-white transform -skew-x-12 rounded-sm shadow-md"></div>
-              <div class="w-2.5 h-10 bg-white transform -skew-x-12 rounded-sm shadow-md"></div>
-              <div class="w-2.5 h-10 bg-white transform -skew-x-12 rounded-sm shadow-md"></div>
-            </div>
-            <div class="flex flex-col justify-between h-9 w-8 ml-0.5">
-              <div class="h-2 bg-white rounded-sm w-full shadow-md"></div>
-              <div class="h-2 bg-white rounded-sm w-4/5 shadow-md"></div>
-              <div class="h-2 bg-white rounded-sm w-full shadow-md"></div>
-            </div>
-          </div>
-          <div class="text-white font-black text-xs tracking-widest mt-1 uppercase">MOBILE ESPORTS</div>
-          <div class="text-[8px] text-yellow-300 font-extrabold tracking-widest mt-0.5">SELVIX GAME ZONE</div>
+          <img src="https://cdn.phototourl.com/member/2026-07-07-8d18e747-46e3-4af1-801d-7bcaca6b0870.png" 
+               alt="Selvix Logo" 
+               class="w-16 h-16 object-contain rounded-2xl shadow-md border border-[#ff5100] bg-[#161f38] p-1 mb-2"/>
+          <div class="text-orange-500 font-black text-xs tracking-widest mt-1 uppercase text-glow-cyan">MOBILE ESPORTS</div>
+          <div class="text-[8px] text-amber-500 font-extrabold tracking-widest mt-0.5">SELVIX GAME ZONE</div>
         </div>
 
-        <h2 class="text-xl font-black text-center text-white uppercase tracking-wider mb-1">Jisajili Sasa</h2>
-        <p class="text-xs text-center text-indigo-200 mb-4 max-w-xs mx-auto">Unda akaunti kuanza kupata michezo bomba zaidi na salio Tanzania!</p>
+        <h2 class="text-lg font-black text-center text-white uppercase tracking-wider mb-1">Jisajili Sasa</h2>
+        <p class="text-xs text-center text-gray-400 mb-4 max-w-xs mx-auto">Unda akaunti kuanza kupata michezo bomba zaidi na salio Tanzania!</p>
 
         <form onsubmit="app.handleRegister(event)" class="space-y-3.5 max-w-sm mx-auto w-full pb-24">
           <!-- Full Name Input -->
-          <div class="relative bg-white rounded-2xl p-3 shadow-md flex items-center gap-3 border border-indigo-200 border-opacity-10">
-            <div class="flex items-center justify-center text-[#7313f3] text-lg w-6">
+          <div class="relative bg-[#161f38] rounded-2xl p-3 shadow-md flex items-center gap-3 border border-gray-800">
+            <div class="flex items-center justify-center text-orange-500 text-lg w-6">
               <i class="fa-solid fa-user-tag"></i>
             </div>
             <div class="flex-grow flex flex-col text-left">
-              <span class="text-[9px] text-gray-400 font-bold uppercase tracking-wider">Majina Matatu Kamili</span>
-              <input type="text" id="reg-fullname" placeholder="Mf: Salehe Juma" required
-                     class="w-full bg-transparent text-gray-900 text-sm font-bold placeholder-gray-300 focus:outline-none" />
+              <span class="text-[9px] text-gray-500 font-bold uppercase tracking-wider">Majina Matatu Kamili</span>
+              <input type="text" id="reg-fullname" placeholder="Mf: Salehe Juma Joseph" required
+                     class="w-full bg-transparent text-white text-sm font-bold placeholder-gray-600 focus:outline-none" />
             </div>
           </div>
 
           <!-- Username Input -->
-          <div class="relative bg-white rounded-2xl p-3 shadow-md flex items-center gap-3 border border-indigo-200 border-opacity-10">
-            <div class="flex items-center justify-center text-[#7313f3] text-lg w-6">
+          <div class="relative bg-[#161f38] rounded-2xl p-3 shadow-md flex items-center gap-3 border border-gray-800">
+            <div class="flex items-center justify-center text-orange-500 text-lg w-6">
               <i class="fa-solid fa-at"></i>
             </div>
             <div class="flex-grow flex flex-col text-left">
-              <span class="text-[9px] text-gray-400 font-bold uppercase tracking-wider">Username</span>
+              <span class="text-[9px] text-gray-500 font-bold uppercase tracking-wider">Username</span>
               <input type="text" id="reg-username" placeholder="Mf: salehe99" required
-                     class="w-full bg-transparent text-gray-900 text-sm font-bold placeholder-gray-300 focus:outline-none" />
+                     class="w-full bg-transparent text-white text-sm font-bold placeholder-gray-600 focus:outline-none" />
             </div>
           </div>
 
           <!-- Phone Number Input -->
-          <div class="relative bg-white rounded-2xl p-3 shadow-md flex items-center gap-3 border border-indigo-200 border-opacity-10">
-            <div class="flex items-center justify-center text-[#7313f3] text-lg w-6">
+          <div class="relative bg-[#161f38] rounded-2xl p-3 shadow-md flex items-center gap-3 border border-gray-800">
+            <div class="flex items-center justify-center text-orange-500 text-lg w-6">
               <i class="fa-solid fa-phone"></i>
             </div>
             <div class="flex-grow flex flex-col text-left">
-              <span class="text-[9px] text-gray-400 font-bold uppercase tracking-wider">Namba ya Simu (+255)</span>
+              <span class="text-[9px] text-gray-500 font-bold uppercase tracking-wider">Namba ya Simu (+255)</span>
               <div class="flex items-center">
-                <span class="text-gray-500 text-sm font-bold mr-1.5">+255</span>
+                <span class="text-white text-sm font-bold mr-1.5">+255</span>
                 <input type="tel" id="reg-phone" placeholder="750020767" required
-                       class="w-full bg-transparent text-gray-900 text-sm font-bold placeholder-gray-300 focus:outline-none" />
+                       class="w-full bg-transparent text-white text-sm font-bold placeholder-gray-600 focus:outline-none" />
               </div>
             </div>
           </div>
 
           <!-- Password Input -->
-          <div class="relative bg-white rounded-2xl p-3 shadow-md flex items-center gap-3 border border-indigo-200 border-opacity-10">
-            <div class="flex items-center justify-center text-[#7313f3] text-lg w-6">
+          <div class="relative bg-[#161f38] rounded-2xl p-3 shadow-md flex items-center gap-3 border border-gray-800">
+            <div class="flex items-center justify-center text-orange-500 text-lg w-6">
               <i class="fa-solid fa-lock"></i>
             </div>
             <div class="flex-grow flex flex-col text-left">
-              <span class="text-[9px] text-gray-400 font-bold uppercase tracking-wider">Neno la Siri (Password)</span>
+              <span class="text-[9px] text-gray-500 font-bold uppercase tracking-wider">Neno la Siri (Password)</span>
               <input type="password" id="reg-password" placeholder="******" required
-                     class="w-full bg-transparent text-gray-900 text-sm font-bold placeholder-gray-300 focus:outline-none" />
+                     class="w-full bg-transparent text-white text-sm font-bold placeholder-gray-600 focus:outline-none" />
             </div>
-            <button type="button" onclick="app.togglePasswordVisibility('reg-password', this)" class="text-gray-400 hover:text-gray-600 w-6">
+            <button type="button" onclick="app.togglePasswordVisibility('reg-password', this)" class="text-gray-500 hover:text-white w-6">
               <i class="fa-solid fa-eye-slash"></i>
             </button>
           </div>
 
           <!-- Referred By Input (Optional) -->
-          <div class="relative bg-white rounded-2xl p-3 shadow-md flex items-center gap-3 border border-indigo-200 border-opacity-10">
-            <div class="flex items-center justify-center text-[#7313f3] text-lg w-6">
+          <div class="relative bg-[#161f38] rounded-2xl p-3 shadow-md flex items-center gap-3 border border-gray-800">
+            <div class="flex items-center justify-center text-orange-500 text-lg w-6">
               <i class="fa-solid fa-user-plus"></i>
             </div>
             <div class="flex-grow flex flex-col text-left">
-              <span class="text-[9px] text-gray-400 font-bold uppercase tracking-wider">Mualikaji (Sio Lazima)</span>
-              <input type="text" id="reg-referredby" placeholder="Mf: admin"
-                     class="w-full bg-transparent text-gray-900 text-sm font-bold placeholder-gray-300 focus:outline-none" />
+              <span class="text-[9px] text-gray-500 font-bold uppercase tracking-wider">Mualikaji (Sio Lazima)</span>
+              <input type="text" id="reg-referredby" placeholder="Mf: admin" value="${localStorage.getItem('selvix_temp_ref') || ''}"
+                     class="w-full bg-transparent text-white text-sm font-bold placeholder-gray-600 focus:outline-none" />
             </div>
           </div>
 
           <!-- Submit Button -->
           <button type="submit" 
-                  class="w-full py-4 px-6 rounded-full bg-gradient-to-r from-purple-800 to-indigo-700 text-white font-extrabold text-sm flex items-center justify-between shadow-lg transform active:scale-95 transition-all duration-300 hover:from-purple-700 hover:to-indigo-600 mt-6">
+                  class="w-full py-4 px-6 rounded-full bg-gradient-to-r from-[#ff8c00] to-[#ff3c00] text-white font-extrabold text-sm flex items-center justify-between shadow-lg transform active:scale-95 transition-all duration-300 hover:opacity-95 mt-6">
             <span class="flex-grow text-center uppercase tracking-wider">Jisajili Sasa</span>
             <i class="fa-solid fa-chevron-right text-sm"></i>
           </button>
         </form>
 
         <!-- Social login container at bottom -->
-        <div class="mt-auto pt-6 pb-4 w-full flex flex-col items-center bg-[#42029e] rounded-t-[2.5rem] px-6 border-t border-indigo-500 border-opacity-10 -mx-6">
+        <div class="mt-auto pt-6 pb-4 w-full flex flex-col items-center bg-[#070a14] rounded-t-[2.5rem] px-6 border-t border-gray-800 -mx-6 shadow-2xl">
           <div class="flex justify-center gap-4 mb-4">
-            <button type="button" data-action="google-login" class="w-14 h-14 bg-white rounded-2xl flex items-center justify-center shadow-md transform active:scale-90 transition">
+            <button type="button" data-action="google-login" class="w-14 h-14 bg-[#161f38] hover:bg-[#1f2b4e] rounded-2xl flex items-center justify-center shadow-md transform active:scale-90 border border-gray-800 transition">
               <img src="https://cdn-icons-png.flaticon.com/512/2991/2991148.png" alt="Google" class="w-7 h-7"/>
-            </button>
-            <button type="button" class="w-14 h-14 bg-[#1877f2] text-white rounded-2xl flex items-center justify-center shadow-md transform active:scale-90 transition">
-              <i class="fa-brands fa-facebook-f text-2xl"></i>
-            </button>
-            <button type="button" class="w-14 h-14 bg-black text-white rounded-2xl flex items-center justify-center shadow-md transform active:scale-90 transition">
-              <i class="fa-brands fa-apple text-2xl"></i>
             </button>
           </div>
 
-          <p class="text-center text-xs text-indigo-200 mt-1">
+          <p class="text-center text-xs text-gray-400 mt-1">
             Tayari una akaunti? 
-            <a href="#" data-action="nav" data-param="login" class="text-yellow-300 hover:underline font-black uppercase">Ingia Hapa</a>
+            <a href="#" data-action="nav" data-param="login" class="text-orange-500 hover:underline font-black uppercase">Ingia Hapa</a>
           </p>
         </div>
       </div>
@@ -838,99 +850,84 @@ class SelvixApp {
 
   getLoginHTML() {
     return `
-      <div class="min-h-screen bg-gradient-to-br from-[#5b0cb5] via-[#7313f3] to-[#3a0680] flex flex-col p-6 fade-in text-white relative">
+      <div class="min-h-screen bg-gradient-to-br from-[#0a0e1a] via-[#121829] to-[#070a14] flex flex-col p-6 fade-in text-white relative">
         <!-- Top Navigation -->
         <div class="flex items-center justify-between mb-8">
           <button data-action="nav" data-param="splash" 
-                  class="w-10 h-10 rounded-2xl bg-white bg-opacity-10 hover:bg-opacity-20 flex items-center justify-center border border-white border-opacity-10 transition">
-            <i class="fa-solid fa-arrow-left text-white text-base"></i>
+                  class="w-10 h-10 rounded-2xl bg-[#161f38] hover:bg-[#1f2b4e] flex items-center justify-center border border-gray-800 transition shadow-md">
+            <i class="fa-solid fa-arrow-left text-[#ff5100] text-base"></i>
           </button>
-          <div class="text-[10px] font-black bg-white bg-opacity-10 px-3 py-1.5 rounded-full uppercase tracking-wider border border-white border-opacity-10">
+          <div class="text-[10px] font-black bg-[#161f38] px-3.5 py-2 rounded-full uppercase tracking-wider border border-gray-800 shadow-sm text-amber-500">
             Ingia Sasa
           </div>
         </div>
 
         <!-- Logo -->
         <div class="flex flex-col items-center mb-6">
-          <div class="flex items-center gap-1.5 justify-center">
-            <div class="flex gap-1">
-              <div class="w-2.5 h-10 bg-white transform -skew-x-12 rounded-sm shadow-md"></div>
-              <div class="w-2.5 h-10 bg-white transform -skew-x-12 rounded-sm shadow-md"></div>
-              <div class="w-2.5 h-10 bg-white transform -skew-x-12 rounded-sm shadow-md"></div>
-            </div>
-            <div class="flex flex-col justify-between h-9 w-8 ml-0.5">
-              <div class="h-2 bg-white rounded-sm w-full shadow-md"></div>
-              <div class="h-2 bg-white rounded-sm w-4/5 shadow-md"></div>
-              <div class="h-2 bg-white rounded-sm w-full shadow-md"></div>
-            </div>
-          </div>
-          <div class="text-white font-black text-xs tracking-widest mt-1 uppercase">MOBILE ESPORTS</div>
-          <div class="text-[8px] text-yellow-300 font-extrabold tracking-widest mt-0.5">SELVIX GAME ZONE</div>
+          <img src="https://cdn.phototourl.com/member/2026-07-07-8d18e747-46e3-4af1-801d-7bcaca6b0870.png" 
+               alt="Selvix Logo" 
+               class="w-16 h-16 object-contain rounded-2xl shadow-md border border-[#ff5100] bg-[#161f38] p-1 mb-2"/>
+          <div class="text-[#ff5100] font-black text-xs tracking-widest mt-1 uppercase text-glow-cyan">MOBILE ESPORTS</div>
+          <div class="text-[8px] text-amber-500 font-extrabold tracking-widest mt-0.5">SELVIX GAME ZONE</div>
         </div>
 
-        <h2 class="text-xl font-black text-center text-white uppercase tracking-wider mb-2">Ingia kwenye akaunti</h2>
-        <p class="text-xs text-center text-indigo-200 mb-6 max-w-xs mx-auto">Ingiza maelezo yako ya akaunti kuanza kupakua na kucheza michezo!</p>
+        <h2 class="text-lg font-black text-center text-white uppercase tracking-wider mb-2">Ingia kwenye akaunti</h2>
+        <p class="text-xs text-center text-gray-400 mb-6 max-w-xs mx-auto">Ingiza maelezo yako ya akaunti kuanza kupakua na kucheza michezo!</p>
 
         <form onsubmit="app.handleLogin(event)" class="space-y-4 max-w-sm mx-auto w-full">
           <!-- Username / Email Input -->
-          <div class="relative bg-white rounded-2xl p-3.5 shadow-md flex items-center gap-3 border border-indigo-200 border-opacity-10">
-            <div class="flex items-center justify-center text-[#7313f3] text-lg w-6">
+          <div class="relative bg-[#161f38] rounded-2xl p-3.5 shadow-md flex items-center gap-3 border border-gray-800">
+            <div class="flex items-center justify-center text-orange-500 text-lg w-6">
               <i class="fa-solid fa-user-tag"></i>
             </div>
             <div class="flex-grow flex flex-col text-left">
-              <span class="text-[9px] text-gray-400 font-bold uppercase tracking-wider">Username au Email</span>
+              <span class="text-[9px] text-gray-500 font-bold uppercase tracking-wider">Username au Email</span>
               <input type="text" id="login-username" placeholder="Mf: salehe99" required
-                     class="w-full bg-transparent text-gray-900 text-sm font-bold placeholder-gray-300 focus:outline-none" />
+                     class="w-full bg-transparent text-white text-sm font-bold placeholder-gray-600 focus:outline-none" />
             </div>
           </div>
 
           <!-- Password Input -->
-          <div class="relative bg-white rounded-2xl p-3.5 shadow-md flex items-center gap-3 border border-indigo-200 border-opacity-10">
-            <div class="flex items-center justify-center text-[#7313f3] text-lg w-6">
+          <div class="relative bg-[#161f38] rounded-2xl p-3.5 shadow-md flex items-center gap-3 border border-gray-800">
+            <div class="flex items-center justify-center text-orange-500 text-lg w-6">
               <i class="fa-solid fa-lock"></i>
             </div>
             <div class="flex-grow flex flex-col text-left">
-              <span class="text-[9px] text-gray-400 font-bold uppercase tracking-wider">Neno la Siri (Password)</span>
+              <span class="text-[9px] text-gray-500 font-bold uppercase tracking-wider">Neno la Siri (Password)</span>
               <input type="password" id="login-password" placeholder="******" required
-                     class="w-full bg-transparent text-gray-900 text-sm font-bold placeholder-gray-300 focus:outline-none" />
+                     class="w-full bg-transparent text-white text-sm font-bold placeholder-gray-600 focus:outline-none" />
             </div>
-            <button type="button" onclick="app.togglePasswordVisibility('login-password', this)" class="text-gray-400 hover:text-gray-600 w-6">
+            <button type="button" onclick="app.togglePasswordVisibility('login-password', this)" class="text-gray-500 hover:text-white w-6">
               <i class="fa-solid fa-eye-slash"></i>
             </button>
           </div>
 
           <!-- Forgot Password -->
           <div class="text-right">
-            <a href="#" data-action="nav" data-param="forgot-password" class="text-xs text-indigo-200 hover:text-white font-bold">Umesahau neno la siri?</a>
+            <a href="#" data-action="nav" data-param="forgot-password" class="text-xs text-orange-500 hover:text-orange-400 font-black text-glow-cyan">Umesahau neno la siri?</a>
           </div>
 
           <!-- Submit Button -->
           <button type="submit" 
-                  class="w-full py-4 px-6 rounded-full bg-gradient-to-r from-purple-800 to-indigo-700 text-white font-extrabold text-sm flex items-center justify-between shadow-lg transform active:scale-95 transition-all duration-300 hover:from-purple-700 hover:to-indigo-600 mt-6">
+                  class="w-full py-4 px-6 rounded-full bg-gradient-to-r from-[#ff8c00] to-[#ff3c00] text-white font-extrabold text-sm flex items-center justify-between shadow-lg transform active:scale-95 transition-all duration-300 hover:opacity-95 mt-6">
             <span class="flex-grow text-center uppercase tracking-wider">Ingia Sasa</span>
             <i class="fa-solid fa-chevron-right text-sm"></i>
           </button>
         </form>
 
         <!-- Social login container at bottom -->
-        <div class="mt-auto pt-8 pb-4 w-full flex flex-col items-center bg-[#42029e] rounded-t-[2.5rem] px-6 border-t border-indigo-500 border-opacity-10 -mx-6">
-          <div class="text-center text-xs text-indigo-200 uppercase font-black tracking-widest mb-4">Ingia kwa mitandao mengine</div>
+        <div class="mt-auto pt-8 pb-4 w-full flex flex-col items-center bg-[#070a14] rounded-t-[2.5rem] px-6 border-t border-gray-800 -mx-6 shadow-2xl">
+          <div class="text-center text-xs text-gray-400 uppercase font-black tracking-widest mb-4">Ingia kwa Google</div>
           
           <div class="flex justify-center gap-4 mb-4">
-            <button type="button" data-action="google-login" class="w-14 h-14 bg-white rounded-2xl flex items-center justify-center shadow-md transform active:scale-90 transition">
+            <button type="button" data-action="google-login" class="w-14 h-14 bg-[#161f38] hover:bg-[#1f2b4e] rounded-2xl flex items-center justify-center shadow-md transform active:scale-90 border border-gray-800 transition">
               <img src="https://cdn-icons-png.flaticon.com/512/2991/2991148.png" alt="Google" class="w-7 h-7"/>
-            </button>
-            <button type="button" class="w-14 h-14 bg-[#1877f2] text-white rounded-2xl flex items-center justify-center shadow-md transform active:scale-90 transition">
-              <i class="fa-brands fa-facebook-f text-2xl"></i>
-            </button>
-            <button type="button" class="w-14 h-14 bg-black text-white rounded-2xl flex items-center justify-center shadow-md transform active:scale-90 transition">
-              <i class="fa-brands fa-apple text-2xl"></i>
             </button>
           </div>
 
-          <p class="text-center text-xs text-indigo-200 mt-2">
+          <p class="text-center text-xs text-gray-400 mt-2">
             Huna akaunti bado? 
-            <a href="#" data-action="nav" data-param="register" class="text-yellow-300 hover:underline font-black uppercase">Jisajili Hapa</a>
+            <a href="#" data-action="nav" data-param="register" class="text-orange-500 hover:underline font-black uppercase">Jisajili Hapa</a>
           </p>
         </div>
       </div>
@@ -939,49 +936,40 @@ class SelvixApp {
 
   getForgotPasswordHTML() {
     return `
-      <div class="min-h-screen bg-gradient-to-br from-[#5b0cb5] via-[#7313f3] to-[#3a0680] flex flex-col p-6 fade-in text-white relative">
+      <div class="min-h-screen bg-gradient-to-br from-[#0a0e1a] via-[#121829] to-[#070a14] flex flex-col p-6 fade-in text-white relative">
         <div class="flex items-center justify-between mb-8">
           <button data-action="nav" data-param="login" 
-                  class="w-10 h-10 rounded-2xl bg-white bg-opacity-10 hover:bg-opacity-20 flex items-center justify-center border border-white border-opacity-10 transition">
-            <i class="fa-solid fa-arrow-left text-white text-base"></i>
+                  class="w-10 h-10 rounded-2xl bg-[#161f38] hover:bg-[#1f2b4e] flex items-center justify-center border border-gray-800 transition shadow-md">
+            <i class="fa-solid fa-arrow-left text-[#ff5100] text-base"></i>
           </button>
-          <div class="text-[10px] font-black bg-white bg-opacity-10 px-3 py-1.5 rounded-full uppercase tracking-wider border border-white border-opacity-10">
+          <div class="text-[10px] font-black bg-[#161f38] px-3.5 py-2 rounded-full uppercase tracking-wider border border-gray-800 shadow-sm text-amber-500">
             Rejesha
           </div>
         </div>
 
         <div class="flex flex-col items-center mb-6">
-          <div class="flex items-center gap-1.5 justify-center">
-            <div class="flex gap-1">
-              <div class="w-2.5 h-10 bg-white transform -skew-x-12 rounded-sm shadow-md"></div>
-              <div class="w-2.5 h-10 bg-white transform -skew-x-12 rounded-sm shadow-md"></div>
-              <div class="w-2.5 h-10 bg-white transform -skew-x-12 rounded-sm shadow-md"></div>
-            </div>
-            <div class="flex flex-col justify-between h-9 w-8 ml-0.5">
-              <div class="h-2 bg-white rounded-sm w-full shadow-md"></div>
-              <div class="h-2 bg-white rounded-sm w-4/5 shadow-md"></div>
-              <div class="h-2 bg-white rounded-sm w-full shadow-md"></div>
-            </div>
-          </div>
-          <div class="text-white font-black text-xs tracking-widest mt-1 uppercase">MOBILE ESPORTS</div>
+          <img src="https://cdn.phototourl.com/member/2026-07-07-8d18e747-46e3-4af1-801d-7bcaca6b0870.png" 
+               alt="Selvix Logo" 
+               class="w-16 h-16 object-contain rounded-2xl shadow-md border border-[#ff5100] bg-[#161f38] p-1 mb-2"/>
+          <div class="text-orange-500 font-black text-xs tracking-widest mt-1 uppercase text-glow-cyan">MOBILE ESPORTS</div>
         </div>
 
-        <div class="w-full max-w-sm mx-auto bg-white rounded-3xl p-6 text-gray-900 shadow-xl border border-indigo-200 border-opacity-20 mt-4 text-center">
-          <div class="w-14 h-14 bg-indigo-100 rounded-2xl flex items-center justify-center text-[#7313f3] text-2xl mx-auto mb-4">
-            <i class="fa-solid fa-key"></i>
+        <div class="w-full max-w-sm mx-auto bg-[#161f38] rounded-3xl p-6 text-white shadow-xl border border-gray-800 mt-4 text-center">
+          <div class="w-14 h-14 bg-amber-50 bg-opacity-10 rounded-2xl flex items-center justify-center text-orange-500 text-2xl mx-auto mb-4 border border-[#ff5100] border-opacity-20 animate-pulse">
+            <i class="fa-solid fa-key text-glow-cyan"></i>
           </div>
-          <h2 class="text-lg font-black uppercase tracking-wider mb-2 text-gray-900">REJESHA PASSWORD</h2>
-          <p class="text-xs text-gray-600 leading-relaxed mb-6">Kwa sababu programu hii inalinda usalama wako kikamilifu, tafadhali wasiliana na msimamizi (Admin Salehe) kuweka neno jipya la siri mara moja!</p>
+          <h2 class="text-base font-black uppercase tracking-wider mb-2 text-white">REJESHA PASSWORD</h2>
+          <p class="text-xs text-gray-400 leading-relaxed mb-6">Kwa sababu programu hii inalinda usalama wako kikamilifu, tafadhali wasiliana na msimamizi (Admin Salehe) kuweka neno jipya la siri mara moja!</p>
           
-          <div class="p-3.5 bg-gray-50 rounded-2xl text-left border border-gray-100 text-xs text-gray-500 mb-6">
-            <div class="flex items-center gap-2 mb-1.5 text-gray-800 font-bold">
-              <i class="fa-solid fa-circle-info text-[#7313f3]"></i> Maelezo ya Admin
+          <div class="p-3.5 bg-[#0a0e1a] rounded-2xl text-left border border-gray-800 text-xs text-gray-400 mb-6">
+            <div class="flex items-center gap-2 mb-1.5 text-white font-bold">
+              <i class="fa-solid fa-circle-info text-orange-500"></i> Maelezo ya Admin
             </div>
-            Siri zako zote zimesimbwa (encrypted). Wasiliana kupitia kitufe cha soga cha msimamizi kwenye ukurasa wa nyumbani au piga simu: <strong class="text-gray-950 font-black">0750 020 767</strong>.
+            Siri zako zote zimesimbwa (encrypted). Wasiliana kupitia kitufe cha soga cha msimamizi kwenye ukurasa wa nyumbani au piga simu: <strong class="text-white font-black">0750 020 767</strong>.
           </div>
 
           <button data-action="nav" data-param="login" 
-                  class="w-full py-3 px-6 rounded-full bg-gradient-to-r from-purple-800 to-indigo-700 text-white font-extrabold text-xs uppercase tracking-wider shadow-md hover:opacity-90 transition">
+                  class="w-full py-3 px-6 rounded-full bg-gradient-to-r from-[#ff8c00] to-[#ff3c00] text-white font-extrabold text-xs uppercase tracking-wider shadow-md hover:opacity-90 transition">
             Rudi Kwenye Kuingia
           </button>
         </div>
@@ -993,14 +981,12 @@ class SelvixApp {
     const user = window.db.getCurrentUser() || { fullName: "Mgeni", pointsBalance: 0, streakCount: 0 };
     return `
       <div class="min-h-screen flex flex-col pb-20 fade-in">
-        <header class="sticky top-0 z-50 px-4 py-3 bg-[#1d0d0d] bg-opacity-95 border-b border-[#3b1212] shadow-xl flex flex-col gap-2">
+        <header class="sticky top-0 z-50 px-4 py-3 bg-[#0b0f19] bg-opacity-95 border-b border-gray-800 shadow-xl flex flex-col gap-2">
           <div class="flex items-center justify-between">
             <div class="flex items-center">
               <i class="fa-solid fa-arrow-left text-white text-lg mr-3 cursor-pointer" data-action="set-tab" data-param="games"></i>
-              <div class="w-8 h-8 rounded bg-green-600 bg-opacity-20 border border-green-500 flex items-center justify-center mr-2">
-                <i class="fa-solid fa-gamepad text-green-400 text-sm"></i>
-              </div>
-              <span class="text-white font-black tracking-wider uppercase text-base">PLAY GAME <span class="text-red-600">STORE</span></span>
+              <img src="https://cdn.phototourl.com/member/2026-07-07-8d18e747-46e3-4af1-801d-7bcaca6b0870.png" class="w-8 h-8 object-contain rounded-lg mr-2 border border-[#ff5100] bg-white p-0.5" />
+              <span class="text-white font-black tracking-wider uppercase text-sm">SELVIX <span class="text-orange-500">GAME ZONE</span></span>
             </div>
             
             <div class="flex items-center space-x-4">
@@ -1151,13 +1137,13 @@ class SelvixApp {
         <!-- Header -->
         <header class="glass-panel px-6 py-4 flex items-center justify-between border-b border-gray-800">
           <div class="flex items-center space-x-3">
-            <i class="fa-solid fa-user-shield text-2xl text-pink-500 text-glow-magenta"></i>
+            <img src="https://cdn.phototourl.com/member/2026-07-07-8d18e747-46e3-4af1-801d-7bcaca6b0870.png" class="w-10 h-10 object-contain rounded-xl border border-orange-500 bg-white p-0.5" />
             <div>
-              <h1 class="text-lg font-bold text-white uppercase text-glow-cyan">Admin Dashboard</h1>
-              <p class="text-xs text-cyan-400 font-semibold uppercase">Usimamizi wa Selvix</p>
+              <h1 class="text-base font-black text-white uppercase tracking-wider">Admin Dashboard</h1>
+              <p class="text-[10px] text-orange-400 font-bold uppercase tracking-widest">Usimamizi wa Selvix</p>
             </div>
           </div>
-          <button data-action="logout" class="px-3 py-1.5 rounded-lg bg-red-600 text-white font-bold uppercase text-xs">LOGOUT</button>
+          <button data-action="logout" class="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-500 text-white font-bold uppercase text-xs shadow-md transition">LOGOUT</button>
         </header>
 
         <div class="p-6 space-y-6">
@@ -1572,12 +1558,34 @@ class SelvixApp {
       <div class="space-y-6 fade-in text-sm">
         <!-- User Badge card -->
         <div class="glass-panel p-6 rounded-3xl flex items-center space-x-4">
-          <div class="w-16 h-16 rounded-full bg-gradient-to-tr from-cyan-500 to-pink-500 flex items-center justify-center text-white font-black text-2xl shadow-glow-cyan uppercase">
+          <div class="w-16 h-16 rounded-full bg-gradient-to-tr from-[#ff8c00] to-[#ff3c00] flex items-center justify-center text-white font-black text-2xl shadow-md uppercase">
             ${user.fullName ? user.fullName[0] : 'S'}
           </div>
           <div>
             <h2 class="text-xl font-bold text-white">${user.fullName}</h2>
             <p class="text-xs text-gray-400">@${user.username} (Mtumiaji)</p>
+          </div>
+        </div>
+
+        <!-- Referral Card -->
+        <div class="glass-panel p-6 rounded-3xl space-y-4">
+          <h3 class="font-bold text-white uppercase text-sm text-glow-cyan">
+            <i class="fa-solid fa-gift mr-2 text-orange-500 animate-pulse"></i>Mpango wa Mialiko (Referrals)
+          </h3>
+          <p class="text-xs text-gray-300 leading-relaxed">
+            Mualike rafiki yako ajiunge na Selvix Game Zone na upate bonasi ya <strong class="text-orange-400">TZS 100 Coins</strong> papo hapo wanapojisajili, nao wanapata <strong class="text-orange-400">TZS 100 Coins</strong> papo hapo!
+          </p>
+          
+          <div class="bg-gray-950 bg-opacity-40 p-3.5 rounded-2xl border border-gray-800 flex flex-col space-y-2">
+            <span class="text-[10px] text-orange-400 font-black uppercase tracking-widest">Kiungo chako cha Mwaliko:</span>
+            <div class="flex items-center gap-2">
+              <input type="text" readonly value="${window.location.origin}${window.location.pathname}?ref=${user.username}" 
+                     class="flex-grow bg-transparent text-white font-mono text-[11px] border-0 focus:ring-0 select-all outline-none overflow-x-auto no-scrollbar" />
+              <button data-action="copy-referral-link" class="px-3 py-2 bg-gradient-to-r from-[#ff8c00] to-[#ff3c00] hover:opacity-90 rounded-xl text-white text-xs font-bold flex items-center space-x-1 transition shrink-0 shadow-md">
+                <i class="fa-solid fa-copy"></i>
+                <span>Copy</span>
+              </button>
+            </div>
           </div>
         </div>
 

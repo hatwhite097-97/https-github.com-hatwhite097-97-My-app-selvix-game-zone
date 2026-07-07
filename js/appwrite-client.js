@@ -70,18 +70,27 @@ class SelvixAppwrite {
         password: password,
         isAdmin: false,
         isBlockedFromChatting: false,
-        pointsBalance: 0.0,
+        pointsBalance: 100.0, // Instant TZS 100 Coins Signup Bonus
         streakCount: 0,
         lastRewardClaimedDate: "",
         referredBy: referredBy.toLowerCase().trim(),
         createdDate: new Date().toLocaleString()
       };
 
-      // Process referral bonus if applicable
+      // Process referral bonus if applicable (Instant 100 coins)
       if (referredBy) {
-        const referrer = window.db.getUser(referrerUsername);
+        const referrer = window.db.getUser(referredBy.toLowerCase().trim());
         if (referrer) {
-          // Will be awarded upon first purchase of TZS 5,000 as per rules
+          referrer.pointsBalance = (referrer.pointsBalance || 0) + 100.0;
+          window.db.saveUser(referrer);
+          window.db.insertTransaction({
+            reference: "REF-BONUS-" + Date.now(),
+            username: referrer.username,
+            gameId: -2, // referral bonus indicator
+            phonenumber: referrer.phoneNumber,
+            amount: 100.0,
+            status: "SUCCESS"
+          });
         }
       }
 
@@ -102,7 +111,7 @@ class SelvixAppwrite {
         phoneNumber: phoneNumber,
         isAdmin: false,
         isBlockedFromChatting: false,
-        pointsBalance: 0.0,
+        pointsBalance: 100.0, // Instant TZS 100 Coins Signup Bonus
         streakCount: 0,
         lastRewardClaimedDate: "",
         referredBy: referredBy,
