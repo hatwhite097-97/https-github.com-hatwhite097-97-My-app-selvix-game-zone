@@ -30,53 +30,66 @@ class SelvixAppwrite {
         
         // Handle post-redirect Google OAuth Session
         const { data: { session }, error } = await this.supabase.auth.getSession();
-        if (session && session.user) {
-          const googleUser = session.user;
-          let username = (googleUser.user_metadata?.full_name || googleUser.email?.split('@')[0] || "user")
-            .toLowerCase()
-            .replace(/[^a-z0-9]/g, '_');
-          
-          let localUser = window.db.getUser(username);
-          if (!localUser) {
-            localUser = {
-              username: username,
-              fullName: googleUser.user_metadata?.full_name || "Google User",
-              phoneNumber: googleUser.phone || "",
-              password: "google_oauth_bypass",
-              isAdmin: false,
-              isBlockedFromChatting: false,
-              pointsBalance: 100.0, // TZS 100 Signup Bonus
-              streakCount: 0,
-              lastRewardClaimedDate: "",
-              referredBy: localStorage.getItem('selvix_temp_ref') || "",
-              createdDate: new Date().toLocaleString()
-            };
-            window.db.saveUser(localUser);
+        
+        const handleSession = (session) => {
+          if (session && session.user) {
+            const googleUser = session.user;
+            let username = (googleUser.user_metadata?.full_name || googleUser.email?.split('@')[0] || "user")
+              .toLowerCase()
+              .replace(/[^a-z0-9]/g, '_');
             
-            // Process referral bonus if any
-            if (localUser.referredBy) {
-              const referrer = window.db.getUser(localUser.referredBy);
-              if (referrer) {
-                referrer.pointsBalance = (referrer.pointsBalance || 0) + 100.0;
-                window.db.saveUser(referrer);
-                window.db.insertTransaction({
-                  reference: "REF-BONUS-" + Date.now(),
-                  username: referrer.username,
-                  gameId: -2,
-                  phonenumber: referrer.phoneNumber,
-                  amount: 100.0,
-                  status: "SUCCESS"
-                });
+            let localUser = window.db.getUser(username);
+            if (!localUser) {
+              localUser = {
+                username: username,
+                fullName: googleUser.user_metadata?.full_name || "Google User",
+                phoneNumber: googleUser.phone || "",
+                password: "google_oauth_bypass",
+                isAdmin: false,
+                isBlockedFromChatting: false,
+                pointsBalance: 100.0, // TZS 100 Signup Bonus
+                streakCount: 0,
+                lastRewardClaimedDate: "",
+                referredBy: localStorage.getItem('selvix_temp_ref') || "",
+                createdDate: new Date().toLocaleString()
+              };
+              window.db.saveUser(localUser);
+              
+              // Process referral bonus if any
+              if (localUser.referredBy) {
+                const referrer = window.db.getUser(localUser.referredBy);
+                if (referrer) {
+                  referrer.pointsBalance = (referrer.pointsBalance || 0) + 100.0;
+                  window.db.saveUser(referrer);
+                  window.db.insertTransaction({
+                    reference: "REF-BONUS-" + Date.now(),
+                    username: referrer.username,
+                    gameId: -2,
+                    phonenumber: referrer.phoneNumber,
+                    amount: 100.0,
+                    status: "SUCCESS"
+                  });
+                }
               }
             }
+            window.db.setCurrentUser(localUser);
+            
+            // Re-trigger visual rendering in app if it's already instantiated
+            if (window.app) {
+              window.app.showView('user-home');
+            }
           }
-          window.db.setCurrentUser(localUser);
-          
-          // Re-trigger visual rendering in app if it's already instantiated
-          if (window.app) {
-            window.app.showView('user-home');
-          }
+        };
+
+        if (session) {
+          handleSession(session);
         }
+
+        this.supabase.auth.onAuthStateChange((event, session) => {
+          if (session) {
+            handleSession(session);
+          }
+        });
       } catch (err) {
         console.error("Failed to initialize Supadatabase: ", err);
         this.isActive = false;

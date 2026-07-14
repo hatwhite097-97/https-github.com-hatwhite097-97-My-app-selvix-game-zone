@@ -658,14 +658,14 @@ class SelvixApp {
     const dbId = document.getElementById('cfg-dbid').value.trim();
 
     if (!proj) {
-      alert("Tafadhali weka Project ID angalau!");
+      alert("Tafadhali weka Supadatabase Anon Key!");
       return;
     }
 
     window.appwrite.updateConfig({
-      endpoint: end || 'https://cloud.appwrite.io/v1',
+      endpoint: end || 'https://szfmkjzknvsrpzsunatx.supabase.co',
       projectId: proj,
-      databaseId: dbId || 'selvix_db'
+      databaseId: dbId || 'selvix_prod'
     });
   }
 
