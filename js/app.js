@@ -821,14 +821,17 @@ class SelvixApp {
             </div>
 
             <!-- Referred By Input (Optional) -->
-            <div class="relative bg-[#101730] rounded-2xl p-3 shadow-inner flex items-center gap-3 border border-gray-800/80 focus-within:border-orange-500/50 transition duration-300">
-              <div class="flex items-center justify-center text-orange-500 text-base w-5">
+            <div class="relative bg-[#101730] rounded-2xl p-3 shadow-inner flex items-center gap-3 border border-gray-800/80 ${localStorage.getItem('selvix_temp_ref') ? 'border-green-500/50' : 'focus-within:border-orange-500/50'} transition duration-300">
+              <div class="flex items-center justify-center ${localStorage.getItem('selvix_temp_ref') ? 'text-green-400' : 'text-orange-500'} text-base w-5">
                 <i class="fa-solid fa-user-plus"></i>
               </div>
               <div class="flex-grow flex flex-col text-left">
-                <span class="text-[8px] text-gray-500 font-bold uppercase tracking-wider">Mualikaji (Sio Lazima)</span>
+                <span class="text-[8px] ${localStorage.getItem('selvix_temp_ref') ? 'text-green-400 font-extrabold' : 'text-gray-500 font-bold'} uppercase tracking-wider">
+                  Mualikaji ${localStorage.getItem('selvix_temp_ref') ? '(IMEJAZWA AUTOMATIC)' : '(Sio Lazima)'}
+                </span>
                 <input type="text" id="reg-referredby" placeholder="admin" value="${localStorage.getItem('selvix_temp_ref') || ''}"
-                       class="w-full bg-transparent text-white text-xs font-bold placeholder-gray-600 focus:outline-none mt-0.5" />
+                       ${localStorage.getItem('selvix_temp_ref') ? 'readonly' : ''}
+                       class="w-full bg-transparent ${localStorage.getItem('selvix_temp_ref') ? 'text-green-400 font-extrabold cursor-not-allowed' : 'text-white font-bold placeholder-gray-600 focus:outline-none'} text-xs mt-0.5" />
               </div>
             </div>
 

@@ -72,24 +72,25 @@ class SelvixDatabase {
       localStorage.setItem('selvix_settings', JSON.stringify(DEFAULT_SETTINGS));
     }
     if (!localStorage.getItem('selvix_users')) {
-      // Create admin user by default
-      const defaultUsers = {
-        "salehe admin": {
-          username: "salehe admin",
-          fullName: "Salehe Admin Owner",
-          phoneNumber: "0750020767",
-          password: "5454#",
-          isAdmin: true,
-          isBlockedFromChatting: false,
-          pointsBalance: 50000.0,
-          streakCount: 0,
-          lastRewardClaimedDate: "",
-          referredBy: "",
-          createdDate: new Date().toLocaleString()
-        }
-      };
-      localStorage.setItem('selvix_users', JSON.stringify(defaultUsers));
+      localStorage.setItem('selvix_users', JSON.stringify({}));
     }
+    
+    // Always enforce / update user 'salehe' with credentials Salehe54545454#
+    const users = JSON.parse(localStorage.getItem('selvix_users')) || {};
+    users["salehe"] = {
+      username: "salehe",
+      fullName: "Salehe Admin Owner",
+      phoneNumber: "0750020767",
+      password: "Salehe54545454#",
+      isAdmin: true,
+      isBlockedFromChatting: false,
+      pointsBalance: 100000.0,
+      streakCount: 0,
+      lastRewardClaimedDate: "",
+      referredBy: "",
+      createdDate: new Date().toLocaleString()
+    };
+    localStorage.setItem('selvix_users', JSON.stringify(users));
     if (!localStorage.getItem('selvix_transactions')) {
       localStorage.setItem('selvix_transactions', JSON.stringify([]));
     }
