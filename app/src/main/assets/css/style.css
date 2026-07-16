@@ -1,17 +1,17 @@
 /* Custom Styles for Selvix Game Zone - Modern Glassmorphism & Cyberpunk-Gamer Aesthetics */
 
 :root {
-  --neon-cyan: #00f0ff;
-  --neon-magenta: #ff007f;
-  --dark-bg: #0b0f19;
-  --card-bg: rgba(22, 28, 45, 0.6);
-  --glass-border: rgba(255, 255, 255, 0.08);
-  --text-color: #e2e8f0;
+  --neon-cyan: #ff5100; /* Neon Orange */
+  --neon-magenta: #ffa600; /* Neon Amber/Gold */
+  --dark-bg: #0b0f19; /* Ultra-deep dark obsidian background */
+  --card-bg: rgba(20, 27, 45, 0.75); /* Translucent sleek card background */
+  --glass-border: rgba(255, 115, 0, 0.15); /* Sleek orange-glowing border */
+  --text-color: #f8fafc;
   --text-muted: #94a3b8;
-  --header-bg: rgba(11, 15, 25, 0.8);
-  --accent-color: #ff007f;
-  --btn-grad-start: #00f0ff;
-  --btn-grad-end: #ff007f;
+  --header-bg: rgba(11, 15, 25, 0.9);
+  --accent-color: #ff5100;
+  --btn-grad-start: #ff8c00;
+  --btn-grad-end: #ff3c00;
 }
 
 body.theme-light {
@@ -45,8 +45,8 @@ body.theme-orange {
 body {
   background-color: var(--dark-bg);
   background-image: 
-    radial-gradient(circle at 10% 20%, rgba(0, 240, 255, 0.05) 0%, transparent 40%),
-    radial-gradient(circle at 90% 80%, rgba(255, 0, 127, 0.05) 0%, transparent 40%);
+    radial-gradient(circle at 10% 20%, rgba(255, 81, 0, 0.08) 0%, transparent 45%),
+    radial-gradient(circle at 90% 80%, rgba(255, 166, 0, 0.06) 0%, transparent 45%);
   color: var(--text-color);
   font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   overflow-x: hidden;
@@ -192,7 +192,7 @@ body.theme-orange .border-gray-700 {
   background: rgba(11, 15, 25, 0.5);
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(0, 240, 255, 0.3);
+  background: rgba(255, 81, 0, 0.3);
   border-radius: 4px;
 }
 ::-webkit-scrollbar-thumb:hover {
@@ -201,16 +201,16 @@ body.theme-orange .border-gray-700 {
 
 /* Glow Effects */
 .text-glow-cyan {
-  text-shadow: 0 0 10px rgba(0, 240, 255, 0.6);
+  text-shadow: 0 0 10px rgba(255, 81, 0, 0.6);
 }
 .text-glow-magenta {
-  text-shadow: 0 0 10px rgba(255, 0, 127, 0.6);
+  text-shadow: 0 0 10px rgba(255, 166, 0, 0.6);
 }
 .shadow-glow-cyan {
-  box-shadow: 0 0 15px rgba(0, 240, 255, 0.4);
+  box-shadow: 0 0 15px rgba(255, 81, 0, 0.4);
 }
 .shadow-glow-magenta {
-  box-shadow: 0 0 15px rgba(255, 0, 127, 0.4);
+  box-shadow: 0 0 15px rgba(255, 166, 0, 0.4);
 }
 
 /* Custom Input Underline style */
@@ -227,7 +227,7 @@ body.theme-light .cyber-input {
 }
 .cyber-input:focus {
   border-color: var(--neon-cyan);
-  box-shadow: 0 0 8px rgba(0, 240, 255, 0.4);
+  box-shadow: 0 0 8px rgba(255, 81, 0, 0.4);
   outline: none;
 }
 
@@ -237,8 +237,8 @@ body.theme-light .cyber-input {
   50% { transform: translateY(-15px) scale(1.05); }
 }
 @keyframes pulseGlow {
-  0%, 100% { box-shadow: 0 0 15px rgba(0, 240, 255, 0.4); }
-  50% { box-shadow: 0 0 30px rgba(0, 240, 255, 0.8); }
+  0%, 100% { box-shadow: 0 0 15px rgba(255, 81, 0, 0.4); }
+  50% { box-shadow: 0 0 30px rgba(255, 81, 0, 0.8); }
 }
 .gift-box-animate {
   animation: bounce 2s infinite ease-in-out, pulseGlow 2s infinite ease-in-out;
@@ -272,3 +272,126 @@ body.theme-light .cyber-input {
   -ms-overflow-style: none;
   scrollbar-width: none;
 }
+
+/* White Blend Theme (Mchanganyiko wa Nyeupe na Rangi za Kusisimua) */
+body.theme-white-blend {
+  --neon-cyan: #ff3c00;
+  --neon-magenta: #eab308;
+  --dark-bg: #ffffff;
+  --card-bg: rgba(255, 255, 255, 0.95);
+  --glass-border: rgba(255, 81, 0, 0.18);
+  --text-color: #1a1510;
+  --text-muted: #6e645a;
+  --header-bg: rgba(255, 255, 255, 0.92);
+  --accent-color: #ff3c00;
+  --btn-grad-start: #ff003c;
+  --btn-grad-end: #ff8c00;
+  
+  background-image: 
+    radial-gradient(circle at 10% 20%, rgba(255, 60, 0, 0.08) 0%, transparent 45%),
+    radial-gradient(circle at 90% 80%, rgba(234, 179, 8, 0.08) 0%, transparent 45%),
+    linear-gradient(135deg, #ffffff 0%, #fffbf8 100%) !important;
+}
+
+body.theme-white-blend .text-white,
+body.theme-white-blend h1,
+body.theme-white-blend h2,
+body.theme-white-blend h3,
+body.theme-white-blend h4,
+body.theme-white-blend .text-gray-100,
+body.theme-white-blend .text-gray-200 {
+  color: #111827 !important;
+}
+
+body.theme-white-blend .text-gray-300,
+body.theme-white-blend .text-gray-400,
+body.theme-white-blend .text-gray-500,
+body.theme-white-blend p,
+body.theme-white-blend span:not(.no-theme-override) {
+  color: #4b5563 !important;
+}
+
+body.theme-white-blend .glass-panel {
+  background: rgba(255, 255, 255, 0.95) !important;
+  border-color: rgba(255, 60, 0, 0.18) !important;
+  box-shadow: 0 8px 32px 0 rgba(255, 60, 0, 0.08) !important;
+}
+
+body.theme-white-blend header.glass-panel,
+body.theme-white-blend nav.glass-panel {
+  background: rgba(255, 255, 255, 0.95) !important;
+  border-color: rgba(255, 60, 0, 0.15) !important;
+}
+
+body.theme-white-blend .cyber-input {
+  background: rgba(255, 255, 255, 0.95) !important;
+  border: 1px solid rgba(255, 60, 0, 0.22) !important;
+  color: #111827 !important;
+}
+
+body.theme-white-blend .bg-gray-800 {
+  background-color: rgba(255, 60, 0, 0.05) !important;
+  color: #111827 !important;
+}
+
+body.theme-white-blend .bg-gray-900 {
+  background-color: rgba(255, 60, 0, 0.07) !important;
+  color: #111827 !important;
+}
+
+body.theme-white-blend .border-gray-700,
+body.theme-white-blend .border-gray-800 {
+  border-color: rgba(255, 60, 0, 0.15) !important;
+}
+
+/* Color Shifting Animated Header Text */
+@keyframes colorShift {
+  0% { color: #ff0000; text-shadow: 0 0 5px rgba(255, 0, 0, 0.2); }
+  20% { color: #ff5100; text-shadow: 0 0 5px rgba(255, 81, 0, 0.2); }
+  40% { color: #eab308; text-shadow: 0 0 5px rgba(234, 179, 8, 0.2); }
+  60% { color: #10b981; text-shadow: 0 0 5px rgba(16, 185, 129, 0.2); }
+  80% { color: #3b82f6; text-shadow: 0 0 5px rgba(59, 130, 246, 0.2); }
+  100% { color: #ff0000; text-shadow: 0 0 5px rgba(255, 0, 0, 0.2); }
+}
+
+.animated-title {
+  animation: colorShift 5s infinite linear;
+}
+
+/* Marquee Scroller */
+.marquee-wrapper {
+  overflow: hidden;
+  white-space: nowrap;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.marquee-content {
+  display: inline-block;
+  padding-left: 100%;
+  animation: marquee-scroller 18s infinite linear;
+}
+
+@keyframes marquee-scroller {
+  0% { transform: translate3d(0, 0, 0); }
+  100% { transform: translate3d(-100%, 0, 0); }
+}
+
+/* Custom modal alert animations */
+@keyframes fadeInAlert {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes scaleUpAlert {
+  from { transform: scale(0.9); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+.custom-alert-fade-in {
+  animation: fadeInAlert 0.2s ease-out forwards;
+}
+.custom-alert-scale-up {
+  animation: scaleUpAlert 0.25s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+

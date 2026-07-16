@@ -27,6 +27,19 @@ class SelvixApp {
       localStorage.setItem('selvix_temp_ref', refParam.trim().toLowerCase());
     }
 
+    // Intercept default window.alert with beautiful custom alert popup overlay
+    window.alert = (msg) => {
+      this.showCustomAlert(msg);
+    };
+
+    // Close autocomplete on click outside
+    document.addEventListener('click', (e) => {
+      const autoContainer = document.getElementById('rbac-autocomplete-container');
+      if (autoContainer && !e.target.closest('#rbac-username') && !e.target.closest('#rbac-autocomplete-container')) {
+        autoContainer.classList.add('hidden');
+      }
+    });
+
     this.applyTheme();
     this.bindEvents();
     this.start();
@@ -43,6 +56,72 @@ class SelvixApp {
       document.body.classList.add('theme-white-blend');
     } else {
       document.body.classList.add('theme-cyberpunk');
+    }
+  }
+
+  showCustomAlert(message, title = "SELVIX GAME ZONE") {
+    // Remove existing if any
+    const existing = document.getElementById('custom-alert-modal');
+    if (existing) existing.remove();
+
+    // Create container
+    const modal = document.createElement('div');
+    modal.id = 'custom-alert-modal';
+    // Tailwind classes for absolute centering, high z-index, and backdrop blur
+    modal.className = 'fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-black/85 backdrop-blur-sm custom-alert-fade-in';
+    
+    // Determine if warning/error
+    let isWarning = false;
+    const msgLower = message.toLowerCase();
+    if (msgLower.includes('makosa') || msgLower.includes('kosa') || msgLower.includes('onyo') || msgLower.includes('imefeli') || msgLower.includes('hazitoshi') || msgLower.includes('imefungwa') || msgLower.includes('sahihi') || msgLower.includes('hakikisha') || msgLower.includes('haipo') || msgLower.includes('futa') || msgLower.includes('tafadhali') || msgLower.includes('lazima') || msgLower.includes('haijasajiliwa')) {
+      isWarning = true;
+    }
+
+    const titleText = isWarning ? "ONYO / TAHADHARI" : title;
+    const iconClass = isWarning ? "fa-triangle-exclamation text-rose-500 animate-pulse" : "fa-circle-info text-cyan-500 animate-bounce";
+    const headerColor = isWarning ? "from-red-600 via-orange-500 to-yellow-500" : "from-cyan-500 via-blue-500 to-indigo-600";
+
+    modal.innerHTML = `
+      <div class="bg-white rounded-3xl w-full max-w-sm overflow-hidden shadow-2xl border-4 border-gray-100 transform custom-alert-scale-up">
+        <!-- Colorful Animated Header -->
+        <div class="bg-gradient-to-r ${headerColor} p-5 text-center relative">
+          <!-- Small glow effect -->
+          <div class="absolute inset-0 bg-white/10 opacity-30 animate-pulse"></div>
+          
+          <div class="w-12 h-12 bg-white rounded-2xl flex items-center justify-center mx-auto mb-2.5 shadow-md">
+            <i class="fa-solid ${iconClass} text-xl"></i>
+          </div>
+          
+          <h3 class="font-extrabold text-xs tracking-[0.2em] text-white uppercase">
+            ★★ SELVIX GAME ZONE ★★
+          </h3>
+          <p class="text-[10px] text-white/90 font-bold uppercase tracking-wider mt-1">${titleText}</p>
+        </div>
+
+        <!-- Body content (Pure White Background with Elegant Wording) -->
+        <div class="p-6 bg-white text-center">
+          <p class="text-xs text-gray-700 font-bold leading-relaxed mb-6 whitespace-pre-line">
+            ${message}
+          </p>
+          
+          <!-- Beautiful interactive OK button -->
+          <button id="custom-alert-ok" class="w-full py-3 px-6 rounded-2xl bg-gradient-to-r from-orange-500 to-red-500 text-white font-black text-xs uppercase tracking-widest shadow-lg shadow-orange-500/20 active:scale-95 transition-all duration-150 cursor-pointer">
+            Sawa (OK)
+          </button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    // Bind event
+    const okBtn = modal.querySelector('#custom-alert-ok');
+    if (okBtn) {
+      okBtn.focus();
+      okBtn.addEventListener('click', () => {
+        modal.classList.add('fade-out');
+        setTimeout(() => modal.remove(), 150);
+      });
     }
   }
 
@@ -109,6 +188,15 @@ class SelvixApp {
       case 'set-tab':
         this.activeTab = param;
         this.render();
+        break;
+      case 'delete-notification':
+        {
+          const user = window.db.getCurrentUser();
+          if (user && user.username) {
+            window.db.deleteUserNotification(user.username, param);
+            this.render();
+          }
+        }
         break;
       case 'set-tx-filter':
         this.transactionStatusFilter = param;
@@ -745,6 +833,7 @@ class SelvixApp {
 
     if (phone.length !== 9 || (!phone.startsWith('7') && !phone.startsWith('6'))) {
       this.forgotError = "Namba ya simu lazima iwe na tarakimu 9 na ianze na 7 au 6!";
+      alert("ONYO / TAHADHARI!\n\nNambari ya simu uliyoingiza sio sahihi. Lazima ianze na 7 au 6 na iwe na jumla ya tarakimu 9 kamili.\n\nMfano sahihi: 7XXXXXXXX au 6XXXXXXXX");
       this.render();
       return;
     }
@@ -752,6 +841,7 @@ class SelvixApp {
     const user = window.db.getUserByPhone(phone);
     if (!user) {
       this.forgotError = "Namba hii haijasajiliwa!";
+      alert("ONYO / TAHADHARI!\n\nNamba ya simu uliyoingiza haijasajiliwa katika mfumo wa Selvix Game Zone.\n\nTafadhali hakikisha umeingiza namba sahihi au jisajili kama mwanachama mpya.");
       this.render();
       return;
     }
@@ -1173,6 +1263,13 @@ class SelvixApp {
       return;
     }
 
+    // Check if user exists in the system
+    const userExists = window.db.getUser(username);
+    if (!userExists) {
+      alert("HAIPO / TAHADHARI!\n\nMtumiaji mwenye jina @" + username + " hayupo katika mfumo wa Selvix Game Zone.\n\nHakikisha umeandika jina sahihi lililosajiliwa!");
+      return;
+    }
+
     const gamesSection = document.getElementById('rbac-sec-games').checked;
     const gatewaysSection = document.getElementById('rbac-sec-gateways').checked;
     const smsSection = document.getElementById('rbac-sec-sms').checked;
@@ -1202,6 +1299,77 @@ class SelvixApp {
       window.db.deleteSubAdminConfig(username);
       this.addNotification("Ruhusa za @" + username + " zimefutwa.");
       this.render();
+    }
+  }
+
+  handleRbacUsernameInput(val) {
+    const trimmedVal = val.trim().toLowerCase();
+    const indicator = document.getElementById('rbac-status-indicator');
+    const autoContainer = document.getElementById('rbac-autocomplete-container');
+    if (!indicator || !autoContainer) return;
+
+    if (!trimmedVal) {
+      indicator.innerHTML = '';
+      autoContainer.innerHTML = '';
+      autoContainer.classList.add('hidden');
+      return;
+    }
+
+    // Check if user exists
+    const user = window.db.getUser(trimmedVal);
+    if (user) {
+      indicator.innerHTML = `
+        <span class="text-emerald-400 text-xs font-bold flex items-center gap-1 animate-pulse" title="Mtumiaji yupo!">
+          <i class="fa-solid fa-circle-check"></i> Yupo
+        </span>
+      `;
+    } else {
+      indicator.innerHTML = `
+        <span class="text-rose-400 text-[10px] font-bold flex items-center gap-1 animate-pulse" title="Mtumiaji hayupo!">
+          <i class="fa-solid fa-triangle-exclamation"></i> Haipo
+        </span>
+      `;
+    }
+
+    // Autocomplete list
+    const allUsers = Object.keys(window.db.getUsers());
+    const matches = allUsers.filter(u => u.includes(trimmedVal));
+
+    if (matches.length > 0) {
+      autoContainer.classList.remove('hidden');
+      autoContainer.innerHTML = matches.map(u => {
+        const uObj = window.db.getUser(u);
+        const nameDisplay = uObj ? uObj.fullName : '';
+        return `
+          <div onclick="app.handleSelectRbacSuggestion('${u}')" 
+               class="p-3 border-b border-gray-800/60 bg-[#0c1224] hover:bg-cyan-950/40 text-gray-200 hover:text-white text-xs cursor-pointer flex justify-between items-center transition">
+            <div>
+              <span class="font-extrabold text-cyan-400">@${u}</span>
+              ${nameDisplay ? `<span class="text-[9px] text-gray-500 ml-1.5">(${nameDisplay})</span>` : ''}
+            </div>
+            <i class="fa-solid fa-chevron-right text-[9px] text-gray-600"></i>
+          </div>
+        `;
+      }).join('');
+    } else {
+      autoContainer.innerHTML = `
+        <div class="p-3 text-center text-[10px] text-gray-500">
+          <i class="fa-solid fa-magnifying-glass-minus mr-1"></i> Hakuna mtumiaji anayeanza na hivi.
+        </div>
+      `;
+      autoContainer.classList.remove('hidden');
+    }
+  }
+
+  handleSelectRbacSuggestion(username) {
+    const input = document.getElementById('rbac-username');
+    if (input) {
+      input.value = username;
+      this.handleRbacUsernameInput(username);
+    }
+    const autoContainer = document.getElementById('rbac-autocomplete-container');
+    if (autoContainer) {
+      autoContainer.classList.add('hidden');
     }
   }
 
@@ -1761,7 +1929,7 @@ class SelvixApp {
               </div>
 
               <!-- Notification Bell with count -->
-              <div data-action="set-tab" data-param="settings" class="relative w-8 h-8 rounded-full bg-gray-800 hover:bg-gray-700/80 flex items-center justify-center text-gray-300 cursor-pointer border border-gray-700/80 shadow-md active:scale-90 transition">
+              <div data-action="set-tab" data-param="notifications" class="relative w-8 h-8 rounded-full bg-gray-800 hover:bg-gray-700/80 flex items-center justify-center text-gray-300 cursor-pointer border border-gray-700/80 shadow-md active:scale-90 transition">
                 <i class="fa-solid fa-bell text-sm"></i>
                 ${unreadCount > 0 ? `
                   <span class="absolute -top-1.5 -right-1.5 bg-red-600 text-white font-black text-[8px] px-1.5 py-0.5 rounded-full animate-pulse border border-gray-900">${unreadCount}</span>
@@ -2379,9 +2547,18 @@ class SelvixApp {
           <p class="text-xs text-gray-400 mb-4">Andika username ya sub-admin kisha weka alama ya tiki kwenye sehemu anazoruhusiwa kuona kwenye Admin Panel pekee.</p>
           
           <div class="space-y-4">
-            <div>
+            <div class="relative">
               <label class="block text-[10px] text-gray-400 font-bold mb-1 uppercase">Sub-Admin Username</label>
-              <input type="text" id="rbac-username" placeholder="salehe_junior" class="w-full p-3 rounded-xl cyber-input text-white text-xs font-bold" />
+              <div class="relative">
+                <input type="text" id="rbac-username" oninput="app.handleRbacUsernameInput(this.value)" placeholder="Andika au chagua jina la mtumiaji..." autocomplete="off" class="w-full p-3 pr-16 rounded-xl cyber-input text-white text-xs font-bold" />
+                <div id="rbac-status-indicator" class="absolute right-3 top-1/2 -translate-y-1/2 flex items-center">
+                  <!-- Dynamic check or warning ticket icon goes here -->
+                </div>
+              </div>
+              <!-- Autocomplete suggestions container -->
+              <div id="rbac-autocomplete-container" class="absolute z-50 left-0 right-0 top-full mt-1 bg-[#101730] border border-gray-800 rounded-xl overflow-hidden max-h-44 overflow-y-auto shadow-2xl hidden">
+                <!-- Autocomplete items -->
+              </div>
             </div>
 
             <div class="grid grid-cols-2 gap-3 p-4 bg-[#090e21] rounded-2xl border border-gray-800">
@@ -2504,7 +2681,7 @@ class SelvixApp {
                       <p class="font-bold text-[9px] text-pink-400 mb-1">@${c.senderUsername} (${c.senderFullName})</p>
                       <p class="leading-relaxed whitespace-pre-wrap text-left">${c.message}</p>
                     </div>
-                    <span class="text-[9px] text-gray-500 mt-1">${c.timestamp}</span>
+                    <span class="text-[6.5px] text-gray-500 mt-0.5 tracking-tight font-extrabold uppercase">${c.timestamp}</span>
                   </div>
                 `;
               }).join('')}
@@ -2627,7 +2804,61 @@ class SelvixApp {
       container.innerHTML = this.getWithdrawalsTabHTML();
     } else if (this.activeTab === 'settings') {
       container.innerHTML = this.getSettingsTabHTML();
+    } else if (this.activeTab === 'notifications') {
+      container.innerHTML = this.getNotificationsTabHTML();
     }
+  }
+
+  getNotificationsTabHTML() {
+    const user = window.db.getCurrentUser() || { username: 'mgeni' };
+    const notifs = window.db.getUserNotifications(user.username);
+
+    return `
+      <div class="space-y-6 fade-in text-sm">
+        <div class="flex items-center justify-between border-b border-gray-800 pb-3 mb-4">
+          <div class="flex items-center gap-2">
+            <div class="w-9 h-9 rounded-xl bg-orange-500/10 border border-orange-500/20 flex items-center justify-center text-orange-500 text-base">
+              <i class="fa-solid fa-envelope"></i>
+            </div>
+            <div>
+              <h2 class="font-extrabold text-white text-sm uppercase tracking-wider text-glow-cyan">Meseji Zangu (My Messages)</h2>
+              <p class="text-[9px] text-orange-400 font-bold uppercase tracking-widest mt-0.5">Ujumbe na Arifa Kutoka kwa Admin</p>
+            </div>
+          </div>
+          <span class="px-2.5 py-1 bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 font-bold rounded-full text-[9px] uppercase tracking-wider">${notifs.length} Mpya</span>
+        </div>
+
+        ${notifs.length === 0 ? `
+          <div class="glass-panel p-10 rounded-3xl flex flex-col items-center justify-center text-center text-gray-400">
+            <div class="w-16 h-16 rounded-full bg-gray-800/80 flex items-center justify-center text-2xl mb-4 border border-gray-700/80">
+              <i class="fa-solid fa-bell-slash animate-bounce" style="animation-duration: 3s"></i>
+            </div>
+            <p class="font-bold text-xs text-white uppercase tracking-wider">Huna meseji zozote!</p>
+            <p class="text-[10px] text-gray-500 max-w-xs mt-1 leading-relaxed">Arifa, ujumbe wa ushindi, au miamala yako ikipokelewa na admin zitaonekana hapa.</p>
+          </div>
+        ` : `
+          <div class="space-y-3">
+            ${notifs.map(n => `
+              <div class="glass-panel p-4 rounded-2xl border border-gray-800/80 bg-opacity-40 hover:border-gray-700 transition flex items-start justify-between gap-4">
+                <div class="flex-grow text-left">
+                  <div class="flex items-center gap-2 mb-1.5">
+                    <span class="inline-block px-2 py-0.5 rounded bg-[#ff5100]/10 border border-[#ff5100]/20 text-[#ff5100] text-[8px] font-black uppercase tracking-wider">Kutoka: Admin</span>
+                    <span class="text-[8px] text-gray-500 font-semibold uppercase tracking-wider">${n.date}</span>
+                  </div>
+                  <p class="text-xs text-white leading-relaxed font-medium whitespace-pre-wrap">${n.msg}</p>
+                </div>
+                
+                <button data-action="delete-notification" data-param="${n.id}" 
+                        class="w-8 h-8 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500 hover:text-white flex items-center justify-center shrink-0 transition active:scale-95 cursor-pointer" 
+                        title="Futa Ujumbe">
+                  <i class="fa-solid fa-trash-can text-xs"></i>
+                </button>
+              </div>
+            `).join('')}
+          </div>
+        `}
+      </div>
+    `;
   }
 
   getGamesTabHTML() {
@@ -2790,7 +3021,7 @@ class SelvixApp {
               <p class="whitespace-pre-wrap text-left">${chat.message}</p>
               
               <!-- Timestamp and Checkmarks -->
-              <div class="flex items-center justify-end gap-1 text-[8px] text-white/50 mt-1.5 font-bold uppercase tracking-wider">
+              <div class="flex items-center justify-end gap-1 text-[6.5px] text-white/40 mt-1 font-extrabold uppercase tracking-tight">
                 <span>${chat.timestamp}</span>
                 ${isMe ? `<i class="fa-solid fa-check-double text-cyan-300"></i>` : ''}
               </div>

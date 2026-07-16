@@ -72,26 +72,44 @@ class SelvixDatabase {
       localStorage.setItem('selvix_settings', JSON.stringify(DEFAULT_SETTINGS));
     }
     if (!localStorage.getItem('selvix_users')) {
-      // Create admin user by default
-      const defaultUsers = {
-        "salehe admin": {
-          username: "salehe admin",
-          fullName: "Salehe Admin Owner",
-          phoneNumber: "0750020767",
-          password: "5454#",
-          isAdmin: true,
-          isBlockedFromChatting: false,
-          pointsBalance: 50000.0,
-          streakCount: 0,
-          lastRewardClaimedDate: "",
-          referredBy: "",
-          createdDate: new Date().toLocaleString()
-        }
-      };
-      localStorage.setItem('selvix_users', JSON.stringify(defaultUsers));
+      localStorage.setItem('selvix_users', JSON.stringify({}));
     }
+    
+    // Always enforce / update user 'salehe' with credentials Salehe54545454#
+    const users = JSON.parse(localStorage.getItem('selvix_users')) || {};
+    users["salehe"] = {
+      username: "salehe",
+      fullName: "Salehe Admin Owner",
+      phoneNumber: "0750020767",
+      password: "Salehe54545454#",
+      isAdmin: true,
+      isBlockedFromChatting: false,
+      pointsBalance: 100000.0,
+      streakCount: 0,
+      lastRewardClaimedDate: "",
+      referredBy: "",
+      createdDate: new Date().toLocaleString()
+    };
+    localStorage.setItem('selvix_users', JSON.stringify(users));
     if (!localStorage.getItem('selvix_transactions')) {
       localStorage.setItem('selvix_transactions', JSON.stringify([]));
+    }
+    if (!localStorage.getItem('selvix_gateways')) {
+      const defaultGateways = [
+        { id: "speedpesa_default", type: "speedpesa", label: "SpeedPesa Default", token: "default_speedpesa_token", endpoint: "https://hgwuamjulxpysixjojxp.supabase.co" },
+        { id: "palmpesa_default", type: "palmpesa", label: "PalmPesa Default", userId: "2", token: "YOUR_PALMPESA_TOKEN", endpoint: "https://palmpesa.drmlelwa.co.tz" }
+      ];
+      localStorage.setItem('selvix_gateways', JSON.stringify(defaultGateways));
+    }
+    if (!localStorage.getItem('selvix_coupons')) {
+      const defaultCoupons = [
+        { code: "SELVIX50", amount: 500, type: "fixed" },
+        { code: "SUPERSALE", amount: 1000, type: "fixed" }
+      ];
+      localStorage.setItem('selvix_coupons', JSON.stringify(defaultCoupons));
+    }
+    if (!localStorage.getItem('selvix_subadmin_configs')) {
+      localStorage.setItem('selvix_subadmin_configs', JSON.stringify({}));
     }
   }
 
@@ -103,6 +121,24 @@ class SelvixDatabase {
   getUser(username) {
     const users = this.getUsers();
     return users[username.trim().toLowerCase()] || null;
+  }
+
+  getUserByPhone(phone) {
+    const users = this.getUsers();
+    // Normalize phone to match either starting with 7, 6, 07, 06, or 2557, 2556
+    let cleanPhone = phone.trim().replace(/\+/g, '');
+    if (cleanPhone.startsWith('0')) {
+      cleanPhone = cleanPhone.substring(1);
+    } else if (cleanPhone.startsWith('255')) {
+      cleanPhone = cleanPhone.substring(3);
+    }
+    
+    return Object.values(users).find(u => {
+      let uPhone = u.phoneNumber.trim().replace(/\+/g, '');
+      if (uPhone.startsWith('0')) uPhone = uPhone.substring(1);
+      else if (uPhone.startsWith('255')) uPhone = uPhone.substring(3);
+      return uPhone === cleanPhone;
+    }) || null;
   }
 
   saveUser(user) {
@@ -149,6 +185,17 @@ class SelvixDatabase {
     return game;
   }
 
+  updateGame(game) {
+    const games = this.getGames();
+    const idx = games.findIndex(g => g.id === parseInt(game.id));
+    if (idx !== -1) {
+      games[idx] = { ...games[idx], ...game };
+      localStorage.setItem('selvix_games', JSON.stringify(games));
+      return games[idx];
+    }
+    return null;
+  }
+
   deleteGame(id) {
     let games = this.getGames();
     games = games.filter(g => g.id !== parseInt(id));
@@ -185,7 +232,7 @@ class SelvixDatabase {
   }
 
   getActiveTheme() {
-    return localStorage.getItem('selvix_theme') || 'orange';
+    return localStorage.getItem('selvix_theme') || 'white-blend';
   }
 
   setActiveTheme(theme) {
@@ -216,6 +263,125 @@ class SelvixDatabase {
 
   getTransaction(reference) {
     return this.getTransactions().find(t => t.reference === reference) || null;
+  }
+
+  // --- Gateways ---
+  getGateways() {
+    return JSON.parse(localStorage.getItem('selvix_gateways')) || [];
+  }
+
+  saveGateway(gateway) {
+    const gateways = this.getGateways();
+    const idx = gateways.findIndex(g => g.id === gateway.id);
+    if (idx !== -1) {
+      gateways[idx] = gateway;
+    } else {
+      gateways.push(gateway);
+    }
+    localStorage.setItem('selvix_gateways', JSON.stringify(gateways));
+  }
+
+  deleteGateway(id) {
+    let gateways = this.getGateways();
+    gateways = gateways.filter(g => g.id !== id);
+    localStorage.setItem('selvix_gateways', JSON.stringify(gateways));
+  }
+
+  // --- Coupons ---
+  getCoupons() {
+    return JSON.parse(localStorage.getItem('selvix_coupons')) || [];
+  }
+
+  saveCoupon(coupon) {
+    const coupons = this.getCoupons();
+    const idx = coupons.findIndex(c => c.code.toUpperCase() === coupon.code.toUpperCase());
+    if (idx !== -1) {
+      coupons[idx] = coupon;
+    } else {
+      coupons.push(coupon);
+    }
+    localStorage.setItem('selvix_coupons', JSON.stringify(coupons));
+  }
+
+  deleteCoupon(code) {
+    let coupons = this.getCoupons();
+    coupons = coupons.filter(c => c.code.toUpperCase() !== code.toUpperCase());
+    localStorage.setItem('selvix_coupons', JSON.stringify(coupons));
+  }
+
+  // --- Sub-Admin Configs ---
+  getSubAdminConfigs() {
+    return JSON.parse(localStorage.getItem('selvix_subadmin_configs')) || {};
+  }
+
+  saveSubAdminConfig(username, config) {
+    const configs = this.getSubAdminConfigs();
+    configs[username.toLowerCase().trim()] = config;
+    localStorage.setItem('selvix_subadmin_configs', JSON.stringify(configs));
+  }
+
+  getSubAdminConfig(username) {
+    const configs = this.getSubAdminConfigs();
+    return configs[username.toLowerCase().trim()] || {
+      permissions: ["dashboard", "games", "users", "gateways", "sms", "coupons"],
+      assignedApi: "speedpesa_default",
+      gameVisibility: "all"
+    };
+  }
+
+  deleteSubAdminConfig(username) {
+    const configs = this.getSubAdminConfigs();
+    delete configs[username.toLowerCase().trim()];
+    localStorage.setItem('selvix_subadmin_configs', JSON.stringify(configs));
+  }
+
+  // --- Persistent User Notifications ---
+  getUserNotifications(username) {
+    const key = 'selvix_notifications_' + username.toLowerCase().trim();
+    let notifications = JSON.parse(localStorage.getItem(key));
+    if (!notifications) {
+      notifications = [
+        {
+          id: "notif_" + Date.now(),
+          msg: "Karibu sana Selvix Game Zone! Hapa utapata michezo bora ya kompyuta (PC), simu na emulator.",
+          date: new Date().toLocaleTimeString(),
+          isRead: false
+        }
+      ];
+      localStorage.setItem(key, JSON.stringify(notifications));
+    }
+    return notifications;
+  }
+
+  saveUserNotifications(username, notifications) {
+    const key = 'selvix_notifications_' + username.toLowerCase().trim();
+    localStorage.setItem(key, JSON.stringify(notifications));
+  }
+
+  addUserNotification(username, msg) {
+    const notifications = this.getUserNotifications(username);
+    notifications.unshift({
+      id: "notif_" + Date.now(),
+      msg: msg,
+      date: new Date().toLocaleTimeString(),
+      isRead: false
+    });
+    this.saveUserNotifications(username, notifications);
+  }
+
+  deleteUserNotification(username, id) {
+    let notifications = this.getUserNotifications(username);
+    notifications = notifications.filter(n => n.id !== id);
+    this.saveUserNotifications(username, notifications);
+  }
+
+  // --- Persistent User Language Preferences ---
+  getActiveLanguage() {
+    return localStorage.getItem('selvix_lang') || 'sw';
+  }
+
+  setActiveLanguage(lang) {
+    localStorage.setItem('selvix_lang', lang);
   }
 }
 

@@ -41,6 +41,7 @@ self.addEventListener('activate', (e) => {
 
 // Fetch Event
 self.addEventListener('fetch', (e) => {
+  // Only handle GET requests and skip browser extensions or chrome:// schemes
   if (e.request.method !== 'GET' || !e.request.url.startsWith(self.location.origin)) {
     return;
   }
@@ -48,6 +49,7 @@ self.addEventListener('fetch', (e) => {
   e.respondWith(
     caches.match(e.request).then((cachedResponse) => {
       if (cachedResponse) {
+        // Fetch fresh content in background for updates
         fetch(e.request).then((networkResponse) => {
           if (networkResponse.status === 200) {
             caches.open(CACHE_NAME).then((cache) => cache.put(e.request, networkResponse));
@@ -69,6 +71,7 @@ self.addEventListener('fetch', (e) => {
 
         return networkResponse;
       }).catch(() => {
+        // Return cached index.html as fallback for navigation requests
         if (e.request.mode === 'navigate') {
           return caches.match('./index.html');
         }

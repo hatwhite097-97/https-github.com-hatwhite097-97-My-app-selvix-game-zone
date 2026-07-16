@@ -7,21 +7,31 @@
   <link rel="manifest" href="./manifest.json">
   <meta name="theme-color" content="#111827">
   
+  <!-- Tailwind CSS CDN -->
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+  <!-- FontAwesome Icons CDN -->
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+  <!-- Custom Selvix Styles -->
   <link href="./css/style.css" rel="stylesheet">
 </head>
 <body class="min-h-screen text-gray-200">
 
-  <div id="app-root" class="max-w-md mx-auto min-h-screen relative shadow-2xl border-x border-gray-900 bg-gray-950">
+  <!-- Main SPA Container -->
+  <div id="app-root" class="max-w-md mx-auto min-h-screen relative shadow-2xl border-x" style="background-color: var(--dark-bg); color: var(--text-color); border-color: var(--glass-border);">
+    <!-- View content is injected here by SPA Engine -->
   </div>
 
+  <!-- Appwrite Web SDK Client CDN -->
   <script src="https://cdn.jsdelivr.net/npm/appwrite@14.0.0"></script>
+  <!-- Supabase Web SDK Client CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   
+  <!-- Selvix SPA Database and Controllers -->
   <script src="./js/database.js"></script>
   <script src="./js/appwrite-client.js"></script>
   <script src="./js/app.js"></script>
 
+  <!-- PWA Service Worker Register -->
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
