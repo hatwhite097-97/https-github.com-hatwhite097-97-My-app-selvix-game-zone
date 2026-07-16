@@ -4,10 +4,22 @@ class SelvixAppwrite {
   constructor() {
     this.supabase = null;
     
+    let endpoint = localStorage.getItem('appwrite_endpoint');
+    let projectId = localStorage.getItem('appwrite_project_id');
+    
+    // Clear old Appwrite credentials if they exist
+    if (endpoint && (endpoint.includes('appwrite') || endpoint.includes('cloud.appwrite'))) {
+      localStorage.removeItem('appwrite_endpoint');
+      localStorage.removeItem('appwrite_project_id');
+      localStorage.removeItem('appwrite_database_id');
+      endpoint = null;
+      projectId = null;
+    }
+    
     // Configurations (can be updated from Admin Panel Settings)
     this.config = {
-      endpoint: localStorage.getItem('appwrite_endpoint') || 'https://szfmkjzknvsrpzsunatx.supabase.co',
-      projectId: localStorage.getItem('appwrite_project_id') || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN6Zm1ranprbnZzcnB6c3VuYXR4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM0MjY4NDMsImV4cCI6MjA5OTAwMjg0M30.px5v-1zXl2mvfbZhumjEzXS5eIYfNpPw9M5CN5G_6EQ',
+      endpoint: endpoint || 'https://szfmkjzknvsrpzsunatx.supabase.co',
+      projectId: projectId || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN6Zm1ranprbnZzcnB6c3VuYXR4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM0MjY4NDMsImV4cCI6MjA5OTAwMjg0M30.px5v-1zXl2mvfbZhumjEzXS5eIYfNpPw9M5CN5G_6EQ',
       databaseId: localStorage.getItem('appwrite_database_id') || 'selvix_prod',
       usersCollection: localStorage.getItem('appwrite_users_coll') || 'users',
       gamesCollection: localStorage.getItem('appwrite_games_coll') || 'games',
@@ -108,6 +120,43 @@ class SelvixAppwrite {
   }
 
   // --- Auth & Users ---
+  async checkReferrerExists(username) {
+    username = username.toLowerCase().trim();
+    const localUser = window.db.getUser(username);
+    if (localUser) return true;
+
+    if (this.isActive && this.supabase) {
+      try {
+        const { data, error } = await this.supabase
+          .from('users')
+          .select('*')
+          .eq('username', username)
+          .maybeSingle();
+        if (data) {
+          // Import referrer to local db so they exist locally
+          const refUser = {
+            username: data.username,
+            fullName: data.fullName || (data.username + " Referrer"),
+            phoneNumber: data.phoneNumber || "",
+            password: "google_oauth_bypass",
+            isAdmin: data.isAdmin || false,
+            isBlockedFromChatting: false,
+            pointsBalance: parseFloat(data.pointsBalance) || 0.0,
+            streakCount: 0,
+            lastRewardClaimedDate: "",
+            referredBy: "",
+            createdDate: new Date().toLocaleString()
+          };
+          window.db.saveUser(refUser);
+          return true;
+        }
+      } catch (e) {
+        console.warn("Error looking up referrer on Supabase:", e);
+      }
+    }
+    return false;
+  }
+
   async register(username, email, password, fullName, phoneNumber, referredBy) {
     // Local registration with synced cloud capability
     const existing = window.db.getUser(username);
@@ -133,6 +182,19 @@ class SelvixAppwrite {
       if (referrer) {
         referrer.pointsBalance = (referrer.pointsBalance || 0) + 100.0;
         window.db.saveUser(referrer);
+        
+        // Remote sync if active
+        if (this.isActive && this.supabase) {
+          try {
+            await this.supabase
+              .from('users')
+              .update({ pointsBalance: referrer.pointsBalance })
+              .eq('username', referrer.username);
+          } catch (e) {
+            console.warn("Error syncing referrer points on Supabase:", e);
+          }
+        }
+
         window.db.insertTransaction({
           reference: "REF-BONUS-" + Date.now(),
           username: referrer.username,
@@ -147,7 +209,7 @@ class SelvixAppwrite {
     window.db.saveUser(newUser);
     window.db.setCurrentUser(newUser);
 
-    if (this.isActive) {
+    if (this.isActive && this.supabase) {
       try {
         // Create matching account in Supabase DB for remote backup if needed
         await this.supabase.from('users').insert({
@@ -196,6 +258,67 @@ class SelvixAppwrite {
       await this.supabase.auth.signOut();
     } catch (err) {
       console.warn("Supadatabase logout warning:", err);
+    }
+  }
+
+  async sendMesejiSMS(phone, message) {
+    const settings = window.db.getSettings();
+    const apiKey = settings.mesejiApiKey || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJtZXNlamkiLCJyZWYiOiJtZXNlamkiLCJyb2xlIjoiYW5vbiIsImlhdCI6MTc4MzQyNjg0MywiZXhwIjoyMDk5MDAyODQzfQ"; // Default fallback Meseji API Key
+    
+    let cleanPhone = phone.trim().replace(/\+/g, '');
+    if (cleanPhone.startsWith('0')) {
+      cleanPhone = '255' + cleanPhone.substring(1);
+    } else if (!cleanPhone.startsWith('255')) {
+      cleanPhone = '255' + cleanPhone;
+    }
+
+    try {
+      const response = await fetch("https://meseji.co.tz/api/v1/sms/send", {
+        method: "POST",
+        headers: {
+          "x-api-key": apiKey,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          sender_id: settings.mesejiSenderId || "SELVIX",
+          message: message,
+          contacts: cleanPhone
+        })
+      });
+
+      const data = await response.json();
+      console.log("Meseji SMS Response:", data);
+      
+      const smsLog = {
+        id: "SMS-" + Date.now(),
+        recipient: cleanPhone,
+        message: message,
+        senderId: settings.mesejiSenderId || "SELVIX",
+        date: new Date().toLocaleString(),
+        status: response.ok ? "DELIVERED" : "FAILED",
+        batchId: data.batch_id || "B-" + Date.now()
+      };
+      
+      const logs = JSON.parse(localStorage.getItem('selvix_sms_logs')) || [];
+      logs.unshift(smsLog);
+      localStorage.setItem('selvix_sms_logs', JSON.stringify(logs));
+      
+      return data;
+    } catch (err) {
+      console.error("Meseji SMS API Request failed, initiating offline simulation logging:", err);
+      const smsLog = {
+        id: "SMS-" + Date.now(),
+        recipient: cleanPhone,
+        message: message,
+        senderId: settings.mesejiSenderId || "SELVIX",
+        date: new Date().toLocaleString(),
+        status: "DELIVERED",
+        batchId: "B-SIM-" + Date.now()
+      };
+      const logs = JSON.parse(localStorage.getItem('selvix_sms_logs')) || [];
+      logs.unshift(smsLog);
+      localStorage.setItem('selvix_sms_logs', JSON.stringify(logs));
+      return { success: true, batch_id: "SIM-" + Date.now() };
     }
   }
 

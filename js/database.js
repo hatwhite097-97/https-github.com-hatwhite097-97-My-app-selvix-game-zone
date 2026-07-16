@@ -94,6 +94,23 @@ class SelvixDatabase {
     if (!localStorage.getItem('selvix_transactions')) {
       localStorage.setItem('selvix_transactions', JSON.stringify([]));
     }
+    if (!localStorage.getItem('selvix_gateways')) {
+      const defaultGateways = [
+        { id: "speedpesa_default", type: "speedpesa", label: "SpeedPesa Default", token: "default_speedpesa_token", endpoint: "https://szfmkjzknvsrpzsunatx.supabase.co" },
+        { id: "palmpesa_default", type: "palmpesa", label: "PalmPesa Default", userId: "2", token: "YOUR_PALMPESA_TOKEN", endpoint: "https://palmpesa.drmlelwa.co.tz" }
+      ];
+      localStorage.setItem('selvix_gateways', JSON.stringify(defaultGateways));
+    }
+    if (!localStorage.getItem('selvix_coupons')) {
+      const defaultCoupons = [
+        { code: "SELVIX50", amount: 500, type: "fixed" },
+        { code: "SUPERSALE", amount: 1000, type: "fixed" }
+      ];
+      localStorage.setItem('selvix_coupons', JSON.stringify(defaultCoupons));
+    }
+    if (!localStorage.getItem('selvix_subadmin_configs')) {
+      localStorage.setItem('selvix_subadmin_configs', JSON.stringify({}));
+    }
   }
 
   // --- Users ---
@@ -104,6 +121,24 @@ class SelvixDatabase {
   getUser(username) {
     const users = this.getUsers();
     return users[username.trim().toLowerCase()] || null;
+  }
+
+  getUserByPhone(phone) {
+    const users = this.getUsers();
+    // Normalize phone to match either starting with 7, 6, 07, 06, or 2557, 2556
+    let cleanPhone = phone.trim().replace(/\+/g, '');
+    if (cleanPhone.startsWith('0')) {
+      cleanPhone = cleanPhone.substring(1);
+    } else if (cleanPhone.startsWith('255')) {
+      cleanPhone = cleanPhone.substring(3);
+    }
+    
+    return Object.values(users).find(u => {
+      let uPhone = u.phoneNumber.trim().replace(/\+/g, '');
+      if (uPhone.startsWith('0')) uPhone = uPhone.substring(1);
+      else if (uPhone.startsWith('255')) uPhone = uPhone.substring(3);
+      return uPhone === cleanPhone;
+    }) || null;
   }
 
   saveUser(user) {
@@ -148,6 +183,17 @@ class SelvixDatabase {
     games.push(game);
     localStorage.setItem('selvix_games', JSON.stringify(games));
     return game;
+  }
+
+  updateGame(game) {
+    const games = this.getGames();
+    const idx = games.findIndex(g => g.id === parseInt(game.id));
+    if (idx !== -1) {
+      games[idx] = { ...games[idx], ...game };
+      localStorage.setItem('selvix_games', JSON.stringify(games));
+      return games[idx];
+    }
+    return null;
   }
 
   deleteGame(id) {
@@ -217,6 +263,76 @@ class SelvixDatabase {
 
   getTransaction(reference) {
     return this.getTransactions().find(t => t.reference === reference) || null;
+  }
+
+  // --- Gateways ---
+  getGateways() {
+    return JSON.parse(localStorage.getItem('selvix_gateways')) || [];
+  }
+
+  saveGateway(gateway) {
+    const gateways = this.getGateways();
+    const idx = gateways.findIndex(g => g.id === gateway.id);
+    if (idx !== -1) {
+      gateways[idx] = gateway;
+    } else {
+      gateways.push(gateway);
+    }
+    localStorage.setItem('selvix_gateways', JSON.stringify(gateways));
+  }
+
+  deleteGateway(id) {
+    let gateways = this.getGateways();
+    gateways = gateways.filter(g => g.id !== id);
+    localStorage.setItem('selvix_gateways', JSON.stringify(gateways));
+  }
+
+  // --- Coupons ---
+  getCoupons() {
+    return JSON.parse(localStorage.getItem('selvix_coupons')) || [];
+  }
+
+  saveCoupon(coupon) {
+    const coupons = this.getCoupons();
+    const idx = coupons.findIndex(c => c.code.toUpperCase() === coupon.code.toUpperCase());
+    if (idx !== -1) {
+      coupons[idx] = coupon;
+    } else {
+      coupons.push(coupon);
+    }
+    localStorage.setItem('selvix_coupons', JSON.stringify(coupons));
+  }
+
+  deleteCoupon(code) {
+    let coupons = this.getCoupons();
+    coupons = coupons.filter(c => c.code.toUpperCase() !== code.toUpperCase());
+    localStorage.setItem('selvix_coupons', JSON.stringify(coupons));
+  }
+
+  // --- Sub-Admin Configs ---
+  getSubAdminConfigs() {
+    return JSON.parse(localStorage.getItem('selvix_subadmin_configs')) || {};
+  }
+
+  saveSubAdminConfig(username, config) {
+    const configs = this.getSubAdminConfigs();
+    configs[username.toLowerCase().trim()] = config;
+    localStorage.setItem('selvix_subadmin_configs', JSON.stringify(configs));
+  }
+
+  getSubAdminConfig(username) {
+    const configs = this.getSubAdminConfigs();
+    return configs[username.toLowerCase().trim()] || {
+      permissions: ["dashboard", "games", "users", "gateways", "sms", "coupons"],
+      assignedApi: "speedpesa_default",
+      gameVisibility: "all"
+    };
+  }
+
+  deleteSubAdminConfig(username) {
+    const configs = this.getSubAdminConfigs();
+    delete configs[username.toLowerCase().trim()];
+    localStorage.setItem('selvix_subadmin_configs', JSON.stringify(configs));
   }
 }
 
