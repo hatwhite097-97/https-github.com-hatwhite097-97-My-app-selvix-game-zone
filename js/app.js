@@ -18,6 +18,7 @@ class SelvixApp {
     this.forgotCountdown = 60;
     this.appliedCoupon = null;
     this.adminTab = 'dashboard'; // dashboard, games, users, gateways, sms, coupons
+    this.transactionStatusFilter = 'ALL';
 
     // Extract & save referral parameter if present in the URL
     const urlParams = new URLSearchParams(window.location.search);
@@ -33,14 +34,31 @@ class SelvixApp {
 
   applyTheme() {
     const theme = window.db.getActiveTheme();
-    document.body.classList.remove('theme-cyberpunk', 'theme-light', 'theme-orange');
+    document.body.classList.remove('theme-cyberpunk', 'theme-light', 'theme-orange', 'theme-white-blend');
     if (theme === 'light') {
       document.body.classList.add('theme-light');
     } else if (theme === 'orange') {
       document.body.classList.add('theme-orange');
+    } else if (theme === 'white-blend') {
+      document.body.classList.add('theme-white-blend');
     } else {
       document.body.classList.add('theme-cyberpunk');
     }
+  }
+
+  handleChangeLanguage(lang) {
+    window.db.setActiveLanguage(lang);
+    const messages = {
+      sw: "Lugha imebadilishwa kuwa Kiswahili!",
+      en: "Language changed to English!",
+      zh: "语言已更改为中文！",
+      fr: "La langue a été changée en Français !",
+      ar: "تم تغيير اللغة إلى العربية!"
+    };
+    const msg = messages[lang] || messages['sw'];
+    this.addNotification(msg);
+    alert(msg);
+    this.render();
   }
 
   start() {
@@ -90,6 +108,10 @@ class SelvixApp {
         break;
       case 'set-tab':
         this.activeTab = param;
+        this.render();
+        break;
+      case 'set-tx-filter':
+        this.transactionStatusFilter = param;
         this.render();
         break;
       case 'change-theme':
@@ -202,6 +224,9 @@ class SelvixApp {
           this.render();
         }
         break;
+      case 'delete-notification':
+        this.handleDeleteNotification(param);
+        break;
       case 'admin-save-subadmin-config':
         this.handleSaveSubAdminConfig(param);
         break;
@@ -256,7 +281,12 @@ class SelvixApp {
   }
 
   addNotification(msg) {
-    this.notifications.unshift({ msg, date: new Date().toLocaleTimeString() });
+    const user = window.db.getCurrentUser();
+    if (user && user.username) {
+      window.db.addUserNotification(user.username, msg);
+    } else {
+      this.notifications.unshift({ id: "notif_" + Date.now(), msg, date: new Date().toLocaleTimeString(), isRead: false });
+    }
     this.renderNotificationsList();
   }
 
@@ -389,12 +419,15 @@ class SelvixApp {
     const msg = input.value.trim();
     if (!msg) return;
 
+    const targetRoom = this.chatRoom === 'Msaada (Admin Support)' ? ('support_' + user.username) : this.chatRoom;
+
     window.db.insertChatMessage({
       senderUsername: user.username,
       senderFullName: user.fullName,
+      senderAvatarUrl: user.avatarUrl || "",
       message: msg,
       isSocial: true,
-      roomName: this.chatRoom
+      roomName: targetRoom
     });
 
     input.value = "";
@@ -695,18 +728,31 @@ class SelvixApp {
   }
 
   async handleForgotSendOtp() {
+    this.forgotError = "";
+    let phone = "";
     const phoneInput = document.getElementById('forgot-phone');
-    if (!phoneInput) return;
-    const phone = phoneInput.value.trim();
+    if (phoneInput) {
+      phone = phoneInput.value.trim();
+    } else {
+      phone = this.forgotPhone;
+    }
+
+    if (!phone) {
+      this.forgotError = "Tafadhali weka namba yako ya simu!";
+      this.render();
+      return;
+    }
 
     if (phone.length !== 9 || (!phone.startsWith('7') && !phone.startsWith('6'))) {
-      alert("Namba ya simu lazima iwe na tarakimu 9 na ianze na 7 au 6.");
+      this.forgotError = "Namba ya simu lazima iwe na tarakimu 9 na ianze na 7 au 6!";
+      this.render();
       return;
     }
 
     const user = window.db.getUserByPhone(phone);
     if (!user) {
-      alert("Namba hii ya simu haijasajiliwa kwenye mfumo yetu!");
+      this.forgotError = "Namba hii haijasajiliwa!";
+      this.render();
       return;
     }
 
@@ -728,12 +774,13 @@ class SelvixApp {
     this.render();
 
     // Start 60s countdown
-    const interval = setInterval(() => {
+    if (this.forgotInterval) clearInterval(this.forgotInterval);
+    this.forgotInterval = setInterval(() => {
       if (this.forgotCountdown > 0) {
         this.forgotCountdown--;
         this.render();
       } else {
-        clearInterval(interval);
+        clearInterval(this.forgotInterval);
       }
     }, 1000);
 
@@ -741,34 +788,35 @@ class SelvixApp {
     const message = `Kodi yako ya uthibitisho ya SELVIX ni ${otp}. Siri yako, usimpe mtu yeyote!`;
     try {
       await window.appwrite.sendMesejiSMS(phone, message);
-      alert("Nambari ya siri (OTP) imetunwa kwenye simu yako kwa SMS!");
+      alert("Nambari ya siri (OTP) imetumwa kwenye simu yako kwa SMS!");
     } catch (err) {
       console.warn("SMS send warning:", err);
     }
   }
 
   handleForgotVerifyOtp() {
+    this.forgotError = "";
     const otpInput = document.getElementById('forgot-otp');
     if (!otpInput) return;
     const otpEntered = otpInput.value.trim();
 
     const session = JSON.parse(localStorage.getItem('selvix_forgot_otp_session'));
     if (!session) {
-      alert("Kipindi kimeisha. Tafadhali omba OTP upya!");
+      this.forgotError = "Kipindi kimeisha. Tafadhali omba OTP upya!";
       this.forgotStep = 1;
       this.render();
       return;
     }
 
     if (Date.now() > session.expires_at) {
-      alert("OTP hii imeisha muda wake (muda wa dakika 5 umeisha). Omba kodi mpya!");
+      this.forgotError = "OTP hii imeisha muda wake (muda wa dakika 5 umeisha). Omba upya!";
       this.forgotStep = 1;
       this.render();
       return;
     }
 
     if (session.attempts >= 3) {
-      alert("Umejaribu mara nyingi sana (Upeo ni 3). Omba OTP mpya!");
+      this.forgotError = "Umejaribu mara nyingi sana. Omba OTP upya!";
       this.forgotStep = 1;
       this.render();
       return;
@@ -780,21 +828,25 @@ class SelvixApp {
     } else {
       session.attempts++;
       localStorage.setItem('selvix_forgot_otp_session', JSON.stringify(session));
-      alert(`Nambari ya siri (OTP) si sahihi! (Jaribio la ${session.attempts} kati ya 3)`);
+      this.forgotError = `Nambari ya siri (OTP) si sahihi! (Jaribio la ${session.attempts} kati ya 3)`;
+      this.render();
     }
   }
 
   handleForgotResetPassword() {
+    this.forgotError = "";
     const newPass = document.getElementById('forgot-newpass').value;
     const confirmPass = document.getElementById('forgot-confirmpass').value;
 
     if (!newPass || newPass.length < 4) {
-      alert("Neno la siri lazima liwe na tarakimu 4 au zaidi!");
+      this.forgotError = "Neno la siri lazima liwe na tarakimu 4 au zaidi!";
+      this.render();
       return;
     }
 
     if (newPass !== confirmPass) {
-      alert("Neno la siri na uthibitisho havilingani!");
+      this.forgotError = "Neno la siri na uthibitisho havilingani!";
+      this.render();
       return;
     }
 
@@ -812,9 +864,10 @@ class SelvixApp {
       alert("Neno lako jipya la siri limehifadhiwa! Sasa unaweza kuingia.");
       this.forgotStep = 1;
       this.forgotPhone = "";
+      this.forgotError = "";
       this.showView('login');
     } else {
-      alert("Kuna tatizo lilitokea. Tafadhali jaribu tena.");
+      this.forgotError = "Kuna tatizo lilitokea. Tafadhali jaribu tena.";
       this.forgotStep = 1;
       this.render();
     }
@@ -897,6 +950,65 @@ class SelvixApp {
     settings[key] = !settings[key];
     window.db.saveSettings(settings);
     this.addNotification("Mipangilio imebadilishwa.");
+    this.render();
+  }
+
+  handleDeleteNotification(id) {
+    const user = window.db.getCurrentUser();
+    if (!user) return;
+    window.db.deleteUserNotification(user.username, id);
+    this.render();
+  }
+
+  handleAdminSendNotification(e) {
+    e.preventDefault();
+    const recipient = document.getElementById('notif-recipient').value;
+    const msg = document.getElementById('notif-message').value.trim();
+
+    if (!msg) {
+      alert("Tafadhali weka ujumbe wa arifa!");
+      return;
+    }
+
+    if (recipient === 'WOTE') {
+      const users = window.db.getUsers();
+      Object.keys(users).forEach(un => {
+        window.db.addUserNotification(un, msg);
+      });
+      alert(`Arifa imetumwa kwa watumiaji wote (${Object.keys(users).length}) kwa ufanisi!`);
+    } else {
+      window.db.addUserNotification(recipient, msg);
+      alert(`Arifa imetumwa kwa @${recipient} kwa ufanisi!`);
+    }
+
+    document.getElementById('notif-message').value = "";
+    this.render();
+  }
+
+  handleAdminSelectSupportUser(username) {
+    this.activeUserChat = username;
+    this.render();
+  }
+
+  handleAdminSendSupportChat(e) {
+    e.preventDefault();
+    const user = window.db.getCurrentUser();
+    if (!user) return;
+
+    const input = document.getElementById('support-reply-message');
+    const msg = input.value.trim();
+    if (!msg) return;
+
+    window.db.insertChatMessage({
+      senderUsername: user.username,
+      senderFullName: user.fullName + ' (Admin)',
+      senderAvatarUrl: user.avatarUrl || "https://cdn.phototourl.com/member/2026-07-07-8d18e747-46e3-4af1-801d-7bcaca6b0870.png",
+      message: msg,
+      isSocial: true,
+      roomName: 'support_' + this.activeUserChat
+    });
+
+    input.value = "";
     this.render();
   }
 
@@ -1133,6 +1245,7 @@ class SelvixApp {
     const fullName = document.getElementById('prof-fullname').value.trim();
     const phone = document.getElementById('prof-phone').value.trim();
     const password = document.getElementById('prof-password').value;
+    const avatarUrl = document.getElementById('prof-avatar').value.trim();
 
     const nameTokens = fullName.split(/\s+/);
     if (nameTokens.length !== 3) {
@@ -1147,6 +1260,7 @@ class SelvixApp {
 
     user.fullName = fullName;
     user.phoneNumber = phone;
+    user.avatarUrl = avatarUrl;
     if (password) user.password = password;
 
     window.db.updateUser(user);
@@ -1598,6 +1712,11 @@ class SelvixApp {
           </div>
 
           <div class="w-full bg-[#101730] rounded-3xl p-6 text-white shadow-xl border border-gray-800/80 text-center">
+            ${this.forgotError ? `
+              <div class="p-3 mb-4 rounded-xl bg-red-500/20 border border-red-500/40 text-red-400 text-xs font-black text-center uppercase tracking-wider">
+                <i class="fa-solid fa-triangle-exclamation mr-1.5 text-red-500 animate-pulse"></i> ${this.forgotError}
+              </div>
+            ` : ''}
             ${cardContent}
           </div>
         </div>
@@ -1608,10 +1727,20 @@ class SelvixApp {
   getUserHomeHTML() {
     const user = window.db.getCurrentUser() || { fullName: "Mgeni", username: "mgeni", pointsBalance: 0, streakCount: 0 };
     const initial = user.fullName ? user.fullName[0].toUpperCase() : "M";
+    const notifications = window.db.getUserNotifications(user.username) || [];
+    const unreadCount = notifications.length;
+
     return `
       <div class="min-h-screen flex flex-col pb-24 fade-in bg-gradient-to-br from-[#070b19] via-[#0f152b] to-[#040610]">
         <!-- Premium Floating-Style Header -->
         <header class="sticky top-0 z-50 px-4 py-3 bg-[#070b19]/90 backdrop-blur-md border-b border-gray-800/70 shadow-xl flex flex-col gap-2.5">
+          <!-- Marquee Scroller -->
+          <div class="marquee-wrapper py-1 bg-black/45 rounded-lg border border-red-500/10 overflow-hidden">
+            <div class="marquee-content font-black text-[10px] tracking-widest uppercase animated-title">
+              ★★ SELVIX GAME ZONE ★★ MICHEZO YOTE KWA SIMU NA PC ★★ KUPAKUA HARAKA ★★ JIPATIE ZAWADI KILA SIKU ★★
+            </div>
+          </div>
+
           <div class="flex items-center justify-between">
             <div class="flex items-center gap-2.5">
               <div class="p-0.5 rounded-xl bg-gradient-to-tr from-orange-500 to-yellow-500 shadow-md">
@@ -1631,7 +1760,15 @@ class SelvixApp {
                 <span>${user.pointsBalance.toFixed(0)} TZS</span>
               </div>
 
-              <!-- User Initials Avatar with logout action -->
+              <!-- Notification Bell with count -->
+              <div data-action="set-tab" data-param="settings" class="relative w-8 h-8 rounded-full bg-gray-800 hover:bg-gray-700/80 flex items-center justify-center text-gray-300 cursor-pointer border border-gray-700/80 shadow-md active:scale-90 transition">
+                <i class="fa-solid fa-bell text-sm"></i>
+                ${unreadCount > 0 ? `
+                  <span class="absolute -top-1.5 -right-1.5 bg-red-600 text-white font-black text-[8px] px-1.5 py-0.5 rounded-full animate-pulse border border-gray-900">${unreadCount}</span>
+                ` : ''}
+              </div>
+
+              <!-- User Initials Avatar with settings action -->
               <div data-action="set-tab" data-param="settings" class="w-8 h-8 rounded-full bg-gradient-to-tr from-orange-600 to-yellow-500 flex items-center justify-center text-white font-black text-xs cursor-pointer border border-white/10 uppercase shadow-md active:scale-90 transition">
                 ${initial}
               </div>
@@ -1860,7 +1997,9 @@ class SelvixApp {
       { id: 'gateways', label: 'Gateways', icon: 'fa-wallet', visible: hasGatewaysAccess },
       { id: 'sms', label: 'Meseji SMS', icon: 'fa-envelope', visible: hasSmsAccess },
       { id: 'coupons', label: 'Coupons', icon: 'fa-tag', visible: hasCouponsAccess },
-      { id: 'rbac', label: 'Sub-Admins', icon: 'fa-user-shield', visible: hasRbacAccess }
+      { id: 'rbac', label: 'Sub-Admins', icon: 'fa-user-shield', visible: hasRbacAccess },
+      { id: 'notifications', label: 'Tuma Arifa', icon: 'fa-bell', visible: isMasterAdmin || subConfig.smsSection },
+      { id: 'support', label: 'Chat za Msaada', icon: 'fa-comments', visible: isMasterAdmin || subConfig.smsSection }
     ];
 
     let tabContent = "";
@@ -2308,6 +2447,122 @@ class SelvixApp {
           </div>
         </div>
       `;
+    } else if (this.adminTab === 'notifications') {
+      const allUsers = window.db.getUsers();
+      tabContent = `
+        <div class="glass-panel p-6 rounded-3xl mb-6">
+          <h3 class="font-bold text-white text-sm uppercase mb-4 text-glow-cyan"><i class="fa-solid fa-paper-plane mr-2 text-orange-500"></i>Tuma Arifa Mpya (Send Notification)</h3>
+          <form onsubmit="app.handleAdminSendNotification(event)" class="space-y-4">
+            <div>
+              <label class="block text-[10px] text-gray-400 font-bold mb-1 uppercase">Mpokeaji (Recipient)</label>
+              <select id="notif-recipient" class="w-full p-3 rounded-xl cyber-input text-white text-xs bg-[#0f142b]">
+                <option value="WOTE">WATUMIAJI WOTE (ALL USERS)</option>
+                ${Object.keys(allUsers).map(un => `<option value="${un}">@${un} (${allUsers[un].fullName})</option>`).join('')}
+              </select>
+            </div>
+            <div>
+              <label class="block text-[10px] text-gray-400 font-bold mb-1 uppercase">Ujumbe wa Arifa (Notification Message)</label>
+              <textarea id="notif-message" rows="3" placeholder="Weka ujumbe wa arifa hapa..." required class="w-full p-3 rounded-xl cyber-input text-white text-xs bg-[#0f142b]"></textarea>
+            </div>
+            <button type="submit" class="w-full py-3.5 rounded-xl bg-gradient-to-r from-orange-600 to-yellow-500 text-white font-bold uppercase tracking-wider text-xs shadow-glow-cyan">
+              <i class="fa-solid fa-share-from-square mr-1"></i> Tuma Arifa Sasa
+            </button>
+          </form>
+        </div>
+      `;
+    } else if (this.adminTab === 'support') {
+      const allChats = window.db.getChats();
+      const supportUsers = [...new Set(allChats
+        .filter(c => c.roomName && c.roomName.startsWith('support_'))
+        .map(c => c.roomName.replace('support_', ''))
+      )];
+
+      const activeUser = this.activeUserChat || (supportUsers.length > 0 ? supportUsers[0] : null);
+      let supportLogHTML = "";
+
+      if (activeUser) {
+        const userChats = allChats.filter(c => c.roomName === 'support_' + activeUser);
+        supportLogHTML = `
+          <div class="glass-panel p-6 rounded-3xl flex flex-col h-[500px]">
+            <div class="flex items-center justify-between border-b border-gray-800 pb-3 mb-4">
+              <div>
+                <h4 class="font-bold text-white text-sm uppercase">Soga na @${activeUser}</h4>
+                <p class="text-[10px] text-orange-400 font-bold uppercase">Private Support Thread</p>
+              </div>
+              <span class="px-2.5 py-1 bg-green-500/10 border border-green-500/20 text-green-400 font-bold rounded-full text-[9px] uppercase tracking-wider animate-pulse">Active</span>
+            </div>
+
+            <!-- Chat logs -->
+            <div class="flex-grow overflow-y-auto space-y-3 p-3 bg-[#080d1e] rounded-2xl border border-gray-800 mb-4" id="admin-support-logs">
+              ${userChats.length === 0 ? `
+                <p class="text-xs text-gray-500 text-center py-10">Bado hakuna ujumbe wowote kwenye thread hii.</p>
+              ` : userChats.map(c => {
+                const isMe = c.senderUsername.toLowerCase() === currentUser.username.toLowerCase();
+                return `
+                  <div class="flex flex-col ${isMe ? 'items-end' : 'items-start'}">
+                    <div class="max-w-[85%] rounded-2xl p-3 text-xs ${isMe ? 'bg-cyan-900 text-cyan-100 rounded-br-none' : 'bg-gray-800 text-gray-100 rounded-bl-none'}">
+                      <p class="font-bold text-[9px] text-pink-400 mb-1">@${c.senderUsername} (${c.senderFullName})</p>
+                      <p class="leading-relaxed whitespace-pre-wrap text-left">${c.message}</p>
+                    </div>
+                    <span class="text-[9px] text-gray-500 mt-1">${c.timestamp}</span>
+                  </div>
+                `;
+              }).join('')}
+            </div>
+
+            <!-- Reply Input form -->
+            <form onsubmit="app.handleAdminSendSupportChat(event)" class="flex gap-2">
+              <input type="text" id="support-reply-message" placeholder="Andika jibu lako kwa @${activeUser}..." required
+                     class="flex-grow p-3 rounded-xl cyber-input text-white text-xs bg-[#0f142b]" />
+              <button type="submit" class="px-5 py-3 rounded-xl bg-gradient-to-r from-cyan-500 to-indigo-600 text-white font-bold uppercase tracking-wider text-xs">
+                Tuma
+              </button>
+            </form>
+          </div>
+        `;
+      } else {
+        supportLogHTML = `
+          <div class="glass-panel p-6 rounded-3xl flex flex-col items-center justify-center text-center text-gray-400 h-[300px]">
+            <div class="w-14 h-14 rounded-full bg-gray-800/80 flex items-center justify-center text-xl mb-3 border border-gray-700/80">
+              <i class="fa-solid fa-comments"></i>
+            </div>
+            <p class="font-bold text-xs">Hakuna mazungumzo ya msaada yaliyopatikana.</p>
+            <p class="text-[10px] text-gray-500 max-w-xs mt-1">Watumiaji watakapoanza kukutumia meseji kwenye chumba cha Msaada, zitaonekana hapa.</p>
+          </div>
+        `;
+      }
+
+      tabContent = `
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <!-- Support threads list -->
+          <div class="md:col-span-1 glass-panel p-6 rounded-3xl">
+            <h3 class="font-bold text-white text-sm uppercase mb-4 text-glow-cyan"><i class="fa-solid fa-users mr-2"></i>Mazungumzo (${supportUsers.length})</h3>
+            <div class="space-y-2 max-h-[500px] overflow-y-auto pr-1">
+              ${supportUsers.length === 0 ? `
+                <p class="text-xs text-gray-500 text-center py-6">Hakuna thread yoyote ya msaada kwa sasa.</p>
+              ` : supportUsers.map(usr => {
+                const isSelected = usr === activeUser;
+                return `
+                  <div onclick="app.handleAdminSelectSupportUser('${usr}')"
+                       class="p-3 rounded-xl border transition-all duration-200 cursor-pointer flex items-center justify-between ${
+                         isSelected 
+                           ? 'bg-gradient-to-r from-orange-500/20 to-red-500/20 border-orange-500 text-white shadow-md' 
+                           : 'bg-[#0f142b]/50 border-gray-800 text-gray-400 hover:border-gray-700 hover:text-white'
+                       }">
+                    <span class="font-bold text-xs">@${usr}</span>
+                    <i class="fa-solid fa-chevron-right text-[10px]"></i>
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          </div>
+
+          <!-- Selected support thread log -->
+          <div class="md:col-span-2">
+            ${supportLogHTML}
+          </div>
+        </div>
+      `;
     }
 
     return `
@@ -2438,7 +2693,7 @@ class SelvixApp {
   }
 
   getChatsTabHTML() {
-    const rooms = ['Chat Kuu', 'FIFA', 'GTA V', 'Call of Duty'];
+    const rooms = ['Chat Kuu', 'Msaada (Admin Support)', 'FIFA', 'GTA V', 'Call of Duty'];
     return `
       <div class="flex flex-col h-[calc(100vh-180px)] fade-in">
         <!-- Room Selector Tabs -->
@@ -2473,23 +2728,74 @@ class SelvixApp {
     const container = document.getElementById('chat-logs-container');
     if (!container) return;
 
-    const chats = window.db.getChats().filter(c => c.roomName === this.chatRoom);
-    const currentUser = window.db.getCurrentUser();
+    const currentUser = window.db.getCurrentUser() || { username: 'mgeni' };
+    const targetRoom = this.chatRoom === 'Msaada (Admin Support)' ? ('support_' + currentUser.username) : this.chatRoom;
+    const chats = window.db.getChats().filter(c => c.roomName === targetRoom);
 
     if (chats.length === 0) {
-      container.innerHTML = `<div class="text-center text-xs text-gray-500 py-10">Anzisha mazungumzo katika chumba cha ${this.chatRoom}!</div>`;
+      container.innerHTML = `
+        <div class="flex flex-col items-center justify-center py-16 text-center text-gray-400 space-y-2">
+          <div class="w-14 h-14 rounded-full bg-cyan-500/10 flex items-center justify-center border border-cyan-500/20 text-cyan-400 text-xl mb-1">
+            <i class="fa-solid fa-comments animate-pulse"></i>
+          </div>
+          <p class="font-bold text-xs text-white">Mwanzo Mpya!</p>
+          <p class="text-[10px] text-gray-500 max-w-xs px-4">Andika ujumbe wako hapa chini kuanzisha soga kwenye chumba cha ${this.chatRoom}!</p>
+        </div>
+      `;
       return;
     }
 
     container.innerHTML = chats.map(chat => {
       const isMe = currentUser && currentUser.username === chat.senderUsername;
+      const initial = chat.senderFullName ? chat.senderFullName[0].toUpperCase() : (chat.senderUsername ? chat.senderUsername[0].toUpperCase() : "?");
+      
+      const colors = [
+        'from-pink-500 to-rose-500',
+        'from-purple-500 to-indigo-500',
+        'from-blue-500 to-cyan-500',
+        'from-teal-500 to-emerald-500',
+        'from-green-500 to-yellow-500',
+        'from-orange-500 to-red-500'
+      ];
+      const hash = chat.senderUsername.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+      const colorClass = colors[hash % colors.length];
+
+      const avatarHTML = chat.senderAvatarUrl ? `
+        <img src="${chat.senderAvatarUrl}" class="w-8 h-8 rounded-full object-cover border border-cyan-500/20 shadow-sm shrink-0" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" />
+        <div style="display:none" class="w-8 h-8 rounded-full bg-gradient-to-tr ${colorClass} flex items-center justify-center text-white font-black text-[10px] uppercase shrink-0">${initial}</div>
+      ` : `
+        <div class="w-8 h-8 rounded-full bg-gradient-to-tr ${colorClass} flex items-center justify-center text-white font-black text-[10px] uppercase shrink-0">${initial}</div>
+      `;
+
       return `
-        <div class="flex flex-col ${isMe ? 'items-end' : 'items-start'} px-3 py-1">
-          <div class="max-w-[80%] rounded-2xl p-3 text-xs ${isMe ? 'bg-cyan-900 text-cyan-100 rounded-br-none' : 'bg-gray-800 text-gray-100 rounded-bl-none'}">
-            <p class="font-bold text-[10px] text-pink-400 mb-1">@${chat.senderUsername} (${chat.senderFullName})</p>
-            <p class="leading-relaxed whitespace-pre-wrap">${chat.message}</p>
+        <div class="flex items-end gap-2.5 ${isMe ? 'flex-row-reverse text-right' : 'flex-row'} px-1 py-1">
+          <!-- Avatar -->
+          <div class="shrink-0 mb-0.5">
+            ${avatarHTML}
           </div>
-          <span class="text-[9px] text-gray-500 mt-0.5">${chat.timestamp}</span>
+
+          <!-- Message Container -->
+          <div class="flex flex-col ${isMe ? 'items-end' : 'items-start'} max-w-[78%]">
+            <!-- Username display -->
+            <span class="text-[9px] text-cyan-400 font-extrabold mb-0.5 px-1 block uppercase tracking-wider">
+              @${chat.senderUsername} <span class="font-bold text-gray-500 capitalize tracking-normal">• ${chat.senderFullName}</span>
+            </span>
+            
+            <!-- Speech Bubble -->
+            <div class="relative px-3.5 py-2.5 rounded-2xl text-xs leading-relaxed ${
+              isMe 
+                ? 'bg-gradient-to-br from-cyan-600 to-blue-700 text-white rounded-br-none shadow-[0_3px_10px_rgba(6,182,212,0.2)]' 
+                : 'bg-gray-800 text-gray-100 rounded-bl-none shadow-[0_3px_10px_rgba(0,0,0,0.15)]'
+            }">
+              <p class="whitespace-pre-wrap text-left">${chat.message}</p>
+              
+              <!-- Timestamp and Checkmarks -->
+              <div class="flex items-center justify-end gap-1 text-[8px] text-white/50 mt-1.5 font-bold uppercase tracking-wider">
+                <span>${chat.timestamp}</span>
+                ${isMe ? `<i class="fa-solid fa-check-double text-cyan-300"></i>` : ''}
+              </div>
+            </div>
+          </div>
         </div>
       `;
     }).join('');
@@ -2535,7 +2841,21 @@ class SelvixApp {
 
   getWithdrawalsTabHTML() {
     const user = window.db.getCurrentUser() || { pointsBalance: 0 };
-    const txs = window.db.getTransactions().filter(t => t.username === user.username && t.gameId === -1);
+    
+    // Initialize transaction status filter if not set
+    if (!this.transactionStatusFilter) {
+      this.transactionStatusFilter = 'ALL';
+    }
+
+    const allTxs = window.db.getTransactions().filter(t => t.username === user.username);
+    let txs = allTxs;
+    if (this.transactionStatusFilter === 'SUCCESS') {
+      txs = allTxs.filter(t => t.status === 'SUCCESS');
+    } else if (this.transactionStatusFilter === 'PENDING') {
+      txs = allTxs.filter(t => t.status === 'PENDING');
+    } else if (this.transactionStatusFilter === 'FAILED') {
+      txs = allTxs.filter(t => t.status === 'FAILED');
+    }
 
     return `
       <div class="space-y-6 fade-in text-sm">
@@ -2573,24 +2893,62 @@ class SelvixApp {
           </button>
         </div>
 
-        <!-- Historic logs -->
-        <div class="glass-panel p-6 rounded-3xl space-y-3">
-          <h3 class="font-bold text-white uppercase text-sm"><i class="fa-solid fa-clock-rotate-left mr-2"></i>Historia ya Kutoa</h3>
+        <!-- Historic logs categorized -->
+        <div class="glass-panel p-6 rounded-3xl space-y-4">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-gray-800 pb-3">
+            <h3 class="font-bold text-white uppercase text-sm"><i class="fa-solid fa-clock-rotate-left mr-2"></i>Historia ya Miamala</h3>
+            
+            <!-- Category Tabs -->
+            <div class="flex gap-1 overflow-x-auto no-scrollbar">
+              <button data-action="set-tx-filter" data-param="ALL"
+                      class="px-2.5 py-1.5 rounded-full text-[9px] font-black uppercase whitespace-nowrap transition ${this.transactionStatusFilter === 'ALL' ? 'bg-[#ff5100] text-white' : 'bg-gray-800 text-gray-400'}">
+                Yote
+              </button>
+              <button data-action="set-tx-filter" data-param="SUCCESS"
+                      class="px-2.5 py-1.5 rounded-full text-[9px] font-black uppercase whitespace-nowrap transition ${this.transactionStatusFilter === 'SUCCESS' ? 'bg-green-600 text-white' : 'bg-gray-800 text-gray-400'}">
+                Success
+              </button>
+              <button data-action="set-tx-filter" data-param="PENDING"
+                      class="px-2.5 py-1.5 rounded-full text-[9px] font-black uppercase whitespace-nowrap transition ${this.transactionStatusFilter === 'PENDING' ? 'bg-yellow-600 text-white' : 'bg-gray-800 text-gray-400'}">
+                Pending
+              </button>
+              <button data-action="set-tx-filter" data-param="FAILED"
+                      class="px-2.5 py-1.5 rounded-full text-[9px] font-black uppercase whitespace-nowrap transition ${this.transactionStatusFilter === 'FAILED' ? 'bg-red-600 text-white' : 'bg-gray-800 text-gray-400'}">
+                Failed
+              </button>
+            </div>
+          </div>
+
           ${txs.length === 0 ? `
-            <p class="text-xs text-gray-500 text-center py-4">Hujawahi kuomba kutoa fedha bado.</p>
+            <p class="text-xs text-gray-500 text-center py-6">Hakuna miamala iliyopatikana kwenye kundi hili.</p>
           ` : `
-            <div class="space-y-2">
-              ${txs.map(tx => `
-                <div class="p-3 bg-gray-800 bg-opacity-60 rounded-xl flex justify-between items-center border border-gray-700">
-                  <div>
-                    <p class="font-bold text-white text-xs">TZS ${tx.amount}</p>
-                    <p class="text-[9px] text-gray-500 mt-0.5">${tx.created}</p>
+            <div class="space-y-2.5">
+              ${txs.map(tx => {
+                const isWithdrawal = tx.gameId === -1;
+                return `
+                  <div class="p-3.5 bg-gray-800 bg-opacity-40 rounded-2xl flex justify-between items-center border border-gray-800/80 hover:border-gray-700/85 transition">
+                    <div>
+                      <div class="flex items-center gap-1.5">
+                        <i class="fa-solid ${isWithdrawal ? 'fa-arrow-up-from-bracket text-indigo-400' : 'fa-gamepad text-cyan-400'} text-xs"></i>
+                        <p class="font-bold text-white text-xs">${isWithdrawal ? 'Kutoa Fedha (Withdrawal)' : ('Kununua Game: ' + tx.gameTitle)}</p>
+                      </div>
+                      <p class="text-[9px] text-gray-500 mt-1 font-semibold uppercase tracking-wider">${tx.created}</p>
+                    </div>
+                    <div class="text-right shrink-0">
+                      <p class="font-bold text-xs ${isWithdrawal ? 'text-rose-400' : 'text-green-400'}">${isWithdrawal ? '-' : '+'} TZS ${tx.amount.toFixed(0)}</p>
+                      <span class="inline-block px-2 py-0.5 rounded text-[8px] font-black uppercase mt-1 border ${
+                        tx.status === 'SUCCESS' 
+                          ? 'bg-green-950/40 text-green-400 border-green-800/60' 
+                          : tx.status === 'FAILED' 
+                          ? 'bg-red-950/40 text-red-400 border-red-800/60' 
+                          : 'bg-yellow-950/40 text-yellow-400 border-yellow-800/60'
+                      }">
+                        ${tx.status === 'SUCCESS' ? 'Imekamilika' : tx.status === 'FAILED' ? 'Imekataliwa' : 'Inasubiri'}
+                      </span>
+                    </div>
                   </div>
-                  <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase ${tx.status === 'SUCCESS' ? 'bg-green-950 text-green-300 border border-green-800' : tx.status === 'FAILED' ? 'bg-red-950 text-red-300 border border-red-800' : 'bg-yellow-950 text-yellow-300 border border-yellow-800'}">
-                    ${tx.status === 'SUCCESS' ? 'Imekamilika' : tx.status === 'FAILED' ? 'Imekataliwa' : 'Inasubiri'}
-                  </span>
-                </div>
-              `).join('')}
+                `;
+              }).join('')}
             </div>
           `}
         </div>
@@ -2604,9 +2962,16 @@ class SelvixApp {
       <div class="space-y-6 fade-in text-sm">
         <!-- User Badge card -->
         <div class="glass-panel p-6 rounded-3xl flex items-center space-x-4">
-          <div class="w-16 h-16 rounded-full bg-gradient-to-tr from-[#ff8c00] to-[#ff3c00] flex items-center justify-center text-white font-black text-2xl shadow-md uppercase">
-            ${user.fullName ? user.fullName[0] : 'S'}
-          </div>
+          ${user.avatarUrl ? `
+            <img src="${user.avatarUrl}" class="w-16 h-16 rounded-full object-cover border border-[#ff8c00]/50 shadow-md shrink-0" onerror="this.style.display='none'; document.getElementById('settings-fallback-avatar').style.display='flex';" />
+            <div id="settings-fallback-avatar" style="display:none" class="w-16 h-16 rounded-full bg-gradient-to-tr from-[#ff8c00] to-[#ff3c00] flex items-center justify-center text-white font-black text-2xl shadow-md uppercase shrink-0">
+              ${user.fullName ? user.fullName[0] : 'S'}
+            </div>
+          ` : `
+            <div class="w-16 h-16 rounded-full bg-gradient-to-tr from-[#ff8c00] to-[#ff3c00] flex items-center justify-center text-white font-black text-2xl shadow-md uppercase shrink-0">
+              ${user.fullName ? user.fullName[0] : 'S'}
+            </div>
+          `}
           <div>
             <h2 class="text-xl font-bold text-white">${user.fullName}</h2>
             <p class="text-xs text-gray-400">@${user.username} (Mtumiaji)</p>
@@ -2650,6 +3015,11 @@ class SelvixApp {
           </div>
 
           <div>
+            <label class="block text-xs text-cyan-400 font-bold mb-1 uppercase">Picha ya Wasifu (Profile Pic URL)</label>
+            <input type="text" id="prof-avatar" value="${user.avatarUrl || ''}" placeholder="https://example.com/picha.png" class="w-full px-4 py-3 rounded-xl cyber-input text-white text-xs" />
+          </div>
+
+          <div>
             <label class="block text-xs text-cyan-400 font-bold mb-1 uppercase">Password Mpya (Acha wazi kama hutaki kubadili)</label>
             <input type="password" id="prof-password" placeholder="******" class="w-full px-4 py-3 rounded-xl cyber-input text-white text-xs" />
           </div>
@@ -2666,7 +3036,11 @@ class SelvixApp {
             <i class="fa-solid fa-palette mr-2"></i>Chagua Mandhari (Theme)
           </h3>
           <p class="text-xs text-gray-400">Kubali muonekano unaoupenda kwa kubofya chaguzi hapa chini:</p>
-          <div class="grid grid-cols-3 gap-2 pt-1">
+          <div class="grid grid-cols-2 gap-2 pt-1">
+            <button data-action="change-theme" data-param="white-blend" 
+                    class="py-2.5 rounded-xl font-bold text-xs tracking-wider border transition-all duration-300 ${window.db.getActiveTheme() === 'white-blend' ? 'bg-gradient-to-r from-red-500 to-orange-500 text-white shadow-lg border-orange-400' : 'bg-gray-800 text-gray-400 border-gray-700 hover:text-white'}">
+              WHITE BLEND (Default)
+            </button>
             <button data-action="change-theme" data-param="cyberpunk" 
                     class="py-2.5 rounded-xl font-bold text-xs tracking-wider border transition-all duration-300 ${window.db.getActiveTheme() === 'cyberpunk' ? 'bg-cyan-500 text-white shadow-glow-cyan border-cyan-400' : 'bg-gray-800 text-gray-400 border-gray-700 hover:text-white'}">
               CYBER
@@ -2679,6 +3053,23 @@ class SelvixApp {
                     class="py-2.5 rounded-xl font-bold text-xs tracking-wider border transition-all duration-300 ${window.db.getActiveTheme() === 'orange' ? 'bg-[#ff6b00] text-white shadow-lg border-[#ff8c3b]' : 'bg-gray-800 text-gray-400 border-gray-700 hover:text-white'}">
               ORANGE
             </button>
+          </div>
+        </div>
+
+        <!-- Language Switcher Card -->
+        <div class="glass-panel p-6 rounded-3xl space-y-4">
+          <h3 class="font-bold text-white uppercase text-sm text-glow-cyan">
+            <i class="fa-solid fa-globe mr-2 text-orange-500 animate-pulse"></i>Lugha (Select Language)
+          </h3>
+          <p class="text-xs text-gray-400">Chagua lugha unayotaka kutumia kwenye Selvix Game Zone:</p>
+          <div>
+            <select onchange="app.handleChangeLanguage(this.value)" class="w-full p-3.5 rounded-xl cyber-input text-white text-xs bg-[#0f142b] border border-gray-700 focus:border-orange-500">
+              <option value="sw" ${window.db.getActiveLanguage() === 'sw' ? 'selected' : ''}>Kiswahili (Swahili)</option>
+              <option value="en" ${window.db.getActiveLanguage() === 'en' ? 'selected' : ''}>English (English)</option>
+              <option value="zh" ${window.db.getActiveLanguage() === 'zh' ? 'selected' : ''}>中文 (Chinese)</option>
+              <option value="fr" ${window.db.getActiveLanguage() === 'fr' ? 'selected' : ''}>Français (French)</option>
+              <option value="ar" ${window.db.getActiveLanguage() === 'ar' ? 'selected' : ''}>العربية (Arabic)</option>
+            </select>
           </div>
         </div>
 
@@ -2710,15 +3101,28 @@ class SelvixApp {
     const list = document.getElementById('notifications-list');
     if (!list) return;
 
-    if (this.notifications.length === 0) {
+    const user = window.db.getCurrentUser();
+    let notifs = [];
+    if (user && user.username) {
+      notifs = window.db.getUserNotifications(user.username);
+    } else {
+      notifs = this.notifications;
+    }
+
+    if (notifs.length === 0) {
       list.innerHTML = `<p class="text-xs text-gray-500 text-center py-4">Arifa zako zote zimeshasomwa!</p>`;
       return;
     }
 
-    list.innerHTML = this.notifications.map(n => `
-      <div class="p-3 bg-gray-800 bg-opacity-40 rounded-xl border border-gray-700 flex justify-between items-start">
-        <p class="text-xs text-gray-300 leading-relaxed">${n.msg}</p>
-        <span class="text-[9px] text-gray-500">${n.date}</span>
+    list.innerHTML = notifs.map(n => `
+      <div class="p-3 bg-gray-800 bg-opacity-40 rounded-xl border border-gray-700 flex items-start gap-3 justify-between">
+        <div class="flex-grow text-left">
+          <p class="text-xs text-gray-300 leading-relaxed">${n.msg}</p>
+          <span class="text-[9px] text-gray-500 block mt-1">${n.date}</span>
+        </div>
+        <button data-action="delete-notification" data-param="${n.id}" class="text-red-400 hover:text-red-600 transition p-1 text-xs" title="Futa Arifa">
+          <i class="fa-solid fa-trash-can"></i>
+        </button>
       </div>
     `).join('');
   }

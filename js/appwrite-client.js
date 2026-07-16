@@ -7,8 +7,8 @@ class SelvixAppwrite {
     let endpoint = localStorage.getItem('appwrite_endpoint');
     let projectId = localStorage.getItem('appwrite_project_id');
     
-    // Clear old Appwrite credentials if they exist
-    if (endpoint && (endpoint.includes('appwrite') || endpoint.includes('cloud.appwrite'))) {
+    // Clear old Appwrite or old Supabase credentials if they exist to force updates
+    if (endpoint && (endpoint.includes('appwrite') || endpoint.includes('cloud.appwrite') || endpoint.includes('szfmkjzknvsrpzsunatx'))) {
       localStorage.removeItem('appwrite_endpoint');
       localStorage.removeItem('appwrite_project_id');
       localStorage.removeItem('appwrite_database_id');
@@ -18,8 +18,8 @@ class SelvixAppwrite {
     
     // Configurations (can be updated from Admin Panel Settings)
     this.config = {
-      endpoint: endpoint || 'https://szfmkjzknvsrpzsunatx.supabase.co',
-      projectId: projectId || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN6Zm1ranprbnZzcnB6c3VuYXR4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM0MjY4NDMsImV4cCI6MjA5OTAwMjg0M30.px5v-1zXl2mvfbZhumjEzXS5eIYfNpPw9M5CN5G_6EQ',
+      endpoint: endpoint || 'https://hgwuamjulxpysixjojxp.supabase.co',
+      projectId: projectId || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imhnd3VhbWp1bHhweXNpeGpvanhwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM1NDkwNjMsImV4cCI6MjA5OTEyNTA2M30.f6xk1ACZordFhwjNivuBN8qSeobDBUJRlsFPRIC6FwA',
       databaseId: localStorage.getItem('appwrite_database_id') || 'selvix_prod',
       usersCollection: localStorage.getItem('appwrite_users_coll') || 'users',
       gamesCollection: localStorage.getItem('appwrite_games_coll') || 'games',

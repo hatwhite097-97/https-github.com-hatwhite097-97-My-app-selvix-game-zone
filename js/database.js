@@ -96,7 +96,7 @@ class SelvixDatabase {
     }
     if (!localStorage.getItem('selvix_gateways')) {
       const defaultGateways = [
-        { id: "speedpesa_default", type: "speedpesa", label: "SpeedPesa Default", token: "default_speedpesa_token", endpoint: "https://szfmkjzknvsrpzsunatx.supabase.co" },
+        { id: "speedpesa_default", type: "speedpesa", label: "SpeedPesa Default", token: "default_speedpesa_token", endpoint: "https://hgwuamjulxpysixjojxp.supabase.co" },
         { id: "palmpesa_default", type: "palmpesa", label: "PalmPesa Default", userId: "2", token: "YOUR_PALMPESA_TOKEN", endpoint: "https://palmpesa.drmlelwa.co.tz" }
       ];
       localStorage.setItem('selvix_gateways', JSON.stringify(defaultGateways));
@@ -232,7 +232,7 @@ class SelvixDatabase {
   }
 
   getActiveTheme() {
-    return localStorage.getItem('selvix_theme') || 'orange';
+    return localStorage.getItem('selvix_theme') || 'white-blend';
   }
 
   setActiveTheme(theme) {
@@ -333,6 +333,55 @@ class SelvixDatabase {
     const configs = this.getSubAdminConfigs();
     delete configs[username.toLowerCase().trim()];
     localStorage.setItem('selvix_subadmin_configs', JSON.stringify(configs));
+  }
+
+  // --- Persistent User Notifications ---
+  getUserNotifications(username) {
+    const key = 'selvix_notifications_' + username.toLowerCase().trim();
+    let notifications = JSON.parse(localStorage.getItem(key));
+    if (!notifications) {
+      notifications = [
+        {
+          id: "notif_" + Date.now(),
+          msg: "Karibu sana Selvix Game Zone! Hapa utapata michezo bora ya kompyuta (PC), simu na emulator.",
+          date: new Date().toLocaleTimeString(),
+          isRead: false
+        }
+      ];
+      localStorage.setItem(key, JSON.stringify(notifications));
+    }
+    return notifications;
+  }
+
+  saveUserNotifications(username, notifications) {
+    const key = 'selvix_notifications_' + username.toLowerCase().trim();
+    localStorage.setItem(key, JSON.stringify(notifications));
+  }
+
+  addUserNotification(username, msg) {
+    const notifications = this.getUserNotifications(username);
+    notifications.unshift({
+      id: "notif_" + Date.now(),
+      msg: msg,
+      date: new Date().toLocaleTimeString(),
+      isRead: false
+    });
+    this.saveUserNotifications(username, notifications);
+  }
+
+  deleteUserNotification(username, id) {
+    let notifications = this.getUserNotifications(username);
+    notifications = notifications.filter(n => n.id !== id);
+    this.saveUserNotifications(username, notifications);
+  }
+
+  // --- Persistent User Language Preferences ---
+  getActiveLanguage() {
+    return localStorage.getItem('selvix_lang') || 'sw';
+  }
+
+  setActiveLanguage(lang) {
+    localStorage.setItem('selvix_lang', lang);
   }
 }
 
