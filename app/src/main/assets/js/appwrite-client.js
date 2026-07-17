@@ -29,11 +29,50 @@ class SelvixAppwrite {
       bucketId: localStorage.getItem('appwrite_bucket_id') || 'selvix_assets'
     };
 
+    // cPanel SQL Database Integration Settings
+    this.cpanelConfig = {
+      enabled: localStorage.getItem('cpanel_db_enabled') === 'true',
+      bridgeUrl: localStorage.getItem('cpanel_bridge_url') || '',
+      secretKey: localStorage.getItem('cpanel_secret_key') || 'selvix_secure_key_123'
+    };
+
     this.isActive = false;
     this.init();
   }
 
+  async callCpanelApi(action, queryParams = {}, method = 'GET', body = null) {
+    if (!this.cpanelConfig.enabled || !this.cpanelConfig.bridgeUrl) return null;
+    try {
+      let url = new URL(this.cpanelConfig.bridgeUrl);
+      url.searchParams.append('action', action);
+      Object.keys(queryParams).forEach(k => url.searchParams.append(k, queryParams[k]));
+      
+      const response = await fetch(url.toString(), {
+        method: method,
+        headers: {
+          "Content-Type": "application/json",
+          "X-Selvix-Key": this.cpanelConfig.secretKey
+        },
+        body: body ? JSON.stringify(body) : null
+      });
+      if (!response.ok) {
+        throw new Error("HTTP Error " + response.status);
+      }
+      return await response.json();
+    } catch (err) {
+      console.error("Failed calling cPanel SQL Bridge API:", err);
+      return { success: false, message: err.message };
+    }
+  }
+
   async init() {
+    if (this.cpanelConfig.enabled) {
+      console.log("cPanel SQL Database active. Supadatabase (Supabase) is disabled as requested.");
+      this.isActive = false;
+      // Bypassed Supabase completely!
+      return;
+    }
+
     if (this.config.endpoint && this.config.projectId && window.supabase) {
       try {
         this.supabase = window.supabase.createClient(this.config.endpoint, this.config.configId || this.config.projectId);
@@ -125,6 +164,33 @@ class SelvixAppwrite {
     const localUser = window.db.getUser(username);
     if (localUser) return true;
 
+    if (this.cpanelConfig.enabled) {
+      try {
+        const res = await this.callCpanelApi('get_user', { username: username });
+        if (res && res.success && res.data) {
+          const data = res.data;
+          const refUser = {
+            username: data.username,
+            fullName: data.fullName || (data.username + " Referrer"),
+            phoneNumber: data.phoneNumber || "",
+            password: data.password || "google_oauth_bypass",
+            isAdmin: data.isAdmin || false,
+            isBlockedFromChatting: data.isBlockedFromChatting || false,
+            pointsBalance: parseFloat(data.pointsBalance) || 0.0,
+            streakCount: parseInt(data.streakCount) || 0,
+            lastRewardClaimedDate: data.lastRewardClaimedDate || "",
+            referredBy: data.referredBy || "",
+            createdDate: data.createdDate || new Date().toLocaleString()
+          };
+          window.db.saveUser(refUser);
+          return true;
+        }
+      } catch (e) {
+        console.warn("Error looking up referrer on cPanel:", e);
+      }
+      return false;
+    }
+
     if (this.isActive && this.supabase) {
       try {
         const { data, error } = await this.supabase
@@ -183,7 +249,16 @@ class SelvixAppwrite {
         referrer.pointsBalance = (referrer.pointsBalance || 0) + 100.0;
         window.db.saveUser(referrer);
         
-        // Remote sync if active
+        // Remote sync cPanel
+        if (this.cpanelConfig.enabled) {
+          try {
+            await this.callCpanelApi('save_user', {}, 'POST', referrer);
+          } catch (e) {
+            console.warn("Error syncing referrer to cPanel:", e);
+          }
+        }
+
+        // Remote sync if active Supabase
         if (this.isActive && this.supabase) {
           try {
             await this.supabase
@@ -195,19 +270,39 @@ class SelvixAppwrite {
           }
         }
 
-        window.db.insertTransaction({
+        const refTx = {
+          id: "TX-REF-" + Date.now(),
           reference: "REF-BONUS-" + Date.now(),
           username: referrer.username,
           gameId: -2,
           phonenumber: referrer.phoneNumber,
           amount: 100.0,
-          status: "SUCCESS"
-        });
+          status: "SUCCESS",
+          created: new Date().toLocaleString()
+        };
+        window.db.insertTransaction(refTx);
+
+        if (this.cpanelConfig.enabled) {
+          try {
+            await this.callCpanelApi('insert_transaction', {}, 'POST', refTx);
+          } catch (e) {
+            console.warn("Error saving ref transaction on cPanel:", e);
+          }
+        }
       }
     }
 
     window.db.saveUser(newUser);
     window.db.setCurrentUser(newUser);
+
+    // Sync registration to cPanel
+    if (this.cpanelConfig.enabled) {
+      try {
+        await this.callCpanelApi('save_user', {}, 'POST', newUser);
+      } catch (e) {
+        console.warn("Error registering user on cPanel:", e);
+      }
+    }
 
     if (this.isActive && this.supabase) {
       try {
@@ -228,8 +323,36 @@ class SelvixAppwrite {
   }
 
   async login(usernameOrEmail, password) {
+    usernameOrEmail = usernameOrEmail.toLowerCase().trim();
     // Authenticate against the local high-speed secure database
-    const user = window.db.getUser(usernameOrEmail);
+    let user = window.db.getUser(usernameOrEmail);
+    
+    // If user is not present locally, check cPanel SQL server first!
+    if (!user && this.cpanelConfig.enabled) {
+      try {
+        const res = await this.callCpanelApi('get_user', { username: usernameOrEmail });
+        if (res && res.success && res.data) {
+          const d = res.data;
+          user = {
+            username: d.username,
+            fullName: d.fullName,
+            phoneNumber: d.phoneNumber,
+            password: d.password,
+            isAdmin: d.isAdmin || false,
+            isBlockedFromChatting: d.isBlockedFromChatting || false,
+            pointsBalance: parseFloat(d.pointsBalance) || 0.0,
+            streakCount: parseInt(d.streakCount) || 0,
+            lastRewardClaimedDate: d.lastRewardClaimedDate || "",
+            referredBy: d.referredBy || "",
+            createdDate: d.createdDate || new Date().toLocaleString()
+          };
+          window.db.saveUser(user);
+        }
+      } catch (e) {
+        console.warn("Error looking up login user on cPanel:", e);
+      }
+    }
+
     if (!user) throw new Error("Mtumiaji huyu hayupo au hajasajiliwa.");
     if (user.password !== password) throw new Error("Neno la siri si sahihi.");
     window.db.setCurrentUser(user);
@@ -319,6 +442,26 @@ class SelvixAppwrite {
       logs.unshift(smsLog);
       localStorage.setItem('selvix_sms_logs', JSON.stringify(logs));
       return { success: true, batch_id: "SIM-" + Date.now() };
+    }
+  }
+
+  async syncUser(userObj) {
+    if (this.cpanelConfig.enabled) {
+      try {
+        await this.callCpanelApi('save_user', {}, 'POST', userObj);
+      } catch (e) {
+        console.warn("Error syncing user to cPanel:", e);
+      }
+    }
+  }
+
+  async syncTransaction(txObj) {
+    if (this.cpanelConfig.enabled) {
+      try {
+        await this.callCpanelApi('insert_transaction', {}, 'POST', txObj);
+      } catch (e) {
+        console.warn("Error syncing transaction to cPanel:", e);
+      }
     }
   }
 

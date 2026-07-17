@@ -145,6 +145,11 @@ class SelvixDatabase {
     const users = this.getUsers();
     users[user.username.trim().toLowerCase()] = user;
     localStorage.setItem('selvix_users', JSON.stringify(users));
+    
+    // Auto-sync user to cPanel SQL server asynchronously if enabled
+    if (window.appwrite && typeof window.appwrite.syncUser === 'function') {
+      window.appwrite.syncUser(user);
+    }
   }
 
   updateUser(user) {
@@ -232,7 +237,7 @@ class SelvixDatabase {
   }
 
   getActiveTheme() {
-    return localStorage.getItem('selvix_theme') || 'white-blend';
+    return localStorage.getItem('selvix_theme') || 'blue';
   }
 
   setActiveTheme(theme) {
@@ -249,6 +254,11 @@ class SelvixDatabase {
     tx.created = new Date().toLocaleString();
     txs.push(tx);
     localStorage.setItem('selvix_transactions', JSON.stringify(txs));
+    
+    // Auto-sync transaction to cPanel SQL server asynchronously if enabled
+    if (window.appwrite && typeof window.appwrite.syncTransaction === 'function') {
+      window.appwrite.syncTransaction(tx);
+    }
     return tx;
   }
 

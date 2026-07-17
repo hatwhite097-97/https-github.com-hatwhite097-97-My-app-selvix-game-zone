@@ -47,15 +47,17 @@ class SelvixApp {
 
   applyTheme() {
     const theme = window.db.getActiveTheme();
-    document.body.classList.remove('theme-cyberpunk', 'theme-light', 'theme-orange', 'theme-white-blend');
+    document.body.classList.remove('theme-cyberpunk', 'theme-light', 'theme-orange', 'theme-white-blend', 'theme-blue');
     if (theme === 'light') {
       document.body.classList.add('theme-light');
     } else if (theme === 'orange') {
       document.body.classList.add('theme-orange');
     } else if (theme === 'white-blend') {
       document.body.classList.add('theme-white-blend');
+    } else if (theme === 'blue') {
+      document.body.classList.add('theme-blue');
     } else {
-      document.body.classList.add('theme-cyberpunk');
+      document.body.classList.add('theme-blue'); // Default theme is blue
     }
   }
 
@@ -850,20 +852,21 @@ class SelvixApp {
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
     
     // Save locally
+    // Save locally with rapid 5 seconds expiration as requested
     const otpSession = {
       phone: phone,
       otp: otp,
-      expires_at: Date.now() + 300000, // 5 minutes
+      expires_at: Date.now() + 5000, // 5 seconds expiration!
       attempts: 0
     };
     localStorage.setItem('selvix_forgot_otp_session', JSON.stringify(otpSession));
 
     this.forgotPhone = phone;
     this.forgotStep = 2;
-    this.forgotCountdown = 60;
+    this.forgotCountdown = 5; // 5 seconds visual countdown!
     this.render();
 
-    // Start 60s countdown
+    // Start 5s countdown
     if (this.forgotInterval) clearInterval(this.forgotInterval);
     this.forgotInterval = setInterval(() => {
       if (this.forgotCountdown > 0) {
@@ -871,6 +874,8 @@ class SelvixApp {
         this.render();
       } else {
         clearInterval(this.forgotInterval);
+        this.forgotError = "ONYO: Muda wa kutumia OTP (sekunde 5) umeisha! Tafadhali omba OTP upya.";
+        this.render();
       }
     }, 1000);
 
@@ -1462,22 +1467,71 @@ class SelvixApp {
     }
   }
 
-  // --- Appwrite Configuration Save ---
+  // --- Appwrite / Database Configuration Save ---
   handleSaveAppwriteConfig() {
     const end = document.getElementById('cfg-endpoint').value.trim();
     const proj = document.getElementById('cfg-project').value.trim();
     const dbId = document.getElementById('cfg-dbid').value.trim();
 
-    if (!proj) {
-      alert("Tafadhali weka Supadatabase Anon Key!");
+    // cPanel settings
+    const cpanelEnabled = document.getElementById('cfg-cpanel-enabled').checked;
+    const cpanelUrl = document.getElementById('cfg-cpanel-url').value.trim();
+    const cpanelKey = document.getElementById('cfg-cpanel-key').value.trim();
+
+    localStorage.setItem('cpanel_db_enabled', cpanelEnabled ? 'true' : 'false');
+    localStorage.setItem('cpanel_bridge_url', cpanelUrl);
+    localStorage.setItem('cpanel_secret_key', cpanelKey);
+
+    if (!proj && !cpanelEnabled) {
+      alert("Tafadhali weka Supadatabase Anon Key, au washa na uweke maelezo ya cPanel!");
       return;
     }
 
     window.appwrite.updateConfig({
       endpoint: end || 'https://szfmkjzknvsrpzsunatx.supabase.co',
-      projectId: proj,
+      projectId: proj || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9',
       databaseId: dbId || 'selvix_prod'
     });
+  }
+
+  async handleTestCpanelConnection() {
+    const cpanelUrl = document.getElementById('cfg-cpanel-url').value.trim();
+    const cpanelKey = document.getElementById('cfg-cpanel-key').value.trim();
+    if (!cpanelUrl) {
+      alert("Tafadhali weka URL ya PHP Bridge kwanza!");
+      return;
+    }
+    
+    const testBtn = document.getElementById('test-cpanel-btn');
+    const origHtml = testBtn ? testBtn.innerHTML : '';
+    if (testBtn) {
+      testBtn.innerHTML = '<i class="fa-solid fa-spinner animate-spin mr-2"></i>Inapima...';
+      testBtn.disabled = true;
+    }
+
+    try {
+      let url = new URL(cpanelUrl);
+      url.searchParams.append('action', 'ping');
+      const res = await fetch(url.toString(), {
+        method: 'GET',
+        headers: {
+          'X-Selvix-Key': cpanelKey
+        }
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        alert("CONGRATULATIONS!\n\nMuunganisho wa cPanel SQL Database unafanya kazi kikamilifu!\n\nJibu: " + data.message);
+      } else {
+        alert("IMEFAILI!\n\nJibu kutoka kwa PHP Bridge:\n" + (data.message || "Hitilafu isiyojulikana"));
+      }
+    } catch (err) {
+      alert("MAKOSA YA MTANDAO!\n\nImeshindwa kufikia PHP Bridge. Hakikisha URL ni sahihi na faili la selvix_cpanel_db.php lipo kwenye server yako.\n\nHakikisha pia umeruhusu CORS.\n\nKosa: " + err.message);
+    } finally {
+      if (testBtn) {
+        testBtn.innerHTML = origHtml;
+        testBtn.disabled = false;
+      }
+    }
   }
 
   // --- RENDERING VIEWS ---
@@ -1881,8 +1935,14 @@ class SelvixApp {
 
           <div class="w-full bg-[#101730] rounded-3xl p-6 text-white shadow-xl border border-gray-800/80 text-center">
             ${this.forgotError ? `
-              <div class="p-3 mb-4 rounded-xl bg-red-500/20 border border-red-500/40 text-red-400 text-xs font-black text-center uppercase tracking-wider">
-                <i class="fa-solid fa-triangle-exclamation mr-1.5 text-red-500 animate-pulse"></i> ${this.forgotError}
+              <div class="mb-5 rounded-2xl bg-white text-slate-900 shadow-2xl border-2 border-amber-500 overflow-hidden text-left transform scale-100 transition duration-300">
+                <div class="bg-amber-500 px-4 py-2 flex items-center justify-between text-white font-black text-xs uppercase tracking-widest">
+                  <span>SELVIX GAME - ONYO ⚠️</span>
+                  <button type="button" onclick="app.forgotError = ''; app.render();" class="text-white hover:text-red-200 font-bold text-sm">&times;</button>
+                </div>
+                <div class="p-4">
+                  <p class="text-xs font-extrabold leading-relaxed text-slate-800">${this.forgotError}</p>
+                </div>
               </div>
             ` : ''}
             ${cardContent}
@@ -2237,24 +2297,84 @@ class SelvixApp {
           `}
         </div>
 
-        <!-- Supadatabase System Configurator -->
-        <div class="glass-panel p-6 rounded-3xl border border-orange-500/30 bg-gradient-to-br from-gray-900 to-[#1e130c]">
-          <h3 class="font-bold text-white text-sm uppercase mb-2 text-glow-cyan"><i class="fa-solid fa-database mr-2 text-orange-500"></i>SUPADATABASE CLOUD INTEGRATION</h3>
-          <p class="text-xs text-gray-400 mb-4">API URL na Anon Key ya Supadatabase.</p>
-          <div class="space-y-3">
-            <div>
-              <label class="block text-[10px] uppercase text-orange-500 font-bold mb-1">Supadatabase API URL</label>
-              <input type="text" id="cfg-endpoint" value="${window.appwrite.config.endpoint}" class="w-full p-2.5 rounded-lg cyber-input text-white text-xs" />
+        <!-- Combined Database Systems Configurator (Supabase / cPanel SQL) -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          
+          <!-- Supadatabase System Configurator -->
+          <div class="glass-panel p-6 rounded-3xl border border-orange-500/30 bg-gradient-to-br from-gray-900 to-[#1e130c]">
+            <h3 class="font-bold text-white text-sm uppercase mb-2 text-glow-cyan">
+              <i class="fa-solid fa-cloud mr-2 text-orange-500 animate-pulse"></i>SUPADATABASE CLOUD INTEGRATION
+            </h3>
+            <p class="text-[10px] text-gray-400 mb-4 uppercase tracking-wider">Hifadhi ya Wingu la Supabase (Mbadala wa Appwrite)</p>
+            
+            <div class="space-y-3">
+              <div>
+                <label class="block text-[9px] uppercase text-orange-500 font-extrabold mb-1 tracking-widest">Supadatabase API URL</label>
+                <input type="text" id="cfg-endpoint" value="${window.appwrite.config.endpoint}" class="w-full p-2.5 rounded-lg cyber-input text-white text-xs font-bold" />
+              </div>
+              <div>
+                <label class="block text-[9px] uppercase text-orange-500 font-extrabold mb-1 tracking-widest">Supadatabase Anon Key</label>
+                <input type="text" id="cfg-project" value="${window.appwrite.config.projectId}" class="w-full p-2.5 rounded-lg cyber-input text-white text-xs font-bold" />
+              </div>
+              <div>
+                <label class="block text-[9px] uppercase text-orange-500 font-extrabold mb-1 tracking-widest">Database ID (Prefix/Schema)</label>
+                <input type="text" id="cfg-dbid" value="${window.appwrite.config.databaseId}" class="w-full p-2.5 rounded-lg cyber-input text-white text-xs font-bold" />
+              </div>
+              <div class="p-3 bg-orange-950/20 border border-orange-900/40 rounded-xl">
+                <p class="text-[10px] text-orange-400 font-bold leading-relaxed">
+                  * Kama ukiwasha cPanel SQL hapa chini, mfumo wa Supadatabase utazimwa moja kwa moja na kutumia cPanel yako!
+                </p>
+              </div>
             </div>
-            <div>
-              <label class="block text-[10px] uppercase text-orange-500 font-bold mb-1">Supadatabase Anon Key</label>
-              <input type="text" id="cfg-project" value="${window.appwrite.config.projectId}" class="w-full p-2.5 rounded-lg cyber-input text-white text-xs" />
-            </div>
-            <button data-action="save-appwrite" 
-                    class="w-full py-3 rounded-xl bg-gradient-to-r from-orange-600 to-yellow-500 text-white font-bold uppercase tracking-wider text-xs shadow-glow-cyan interactive-target">
-              Unganisha Wingu la Supadatabase
-            </button>
           </div>
+
+          <!-- cPanel SQL System Configurator -->
+          <div class="glass-panel p-6 rounded-3xl border border-blue-500/30 bg-gradient-to-br from-gray-900 to-[#0b1b3a]">
+            <h3 class="font-bold text-white text-sm uppercase mb-2 text-glow-cyan">
+              <i class="fa-solid fa-server mr-2 text-blue-400"></i>CPANEL SQL INTEGRATION (DATABASE YA CPANEL)
+            </h3>
+            <p class="text-[10px] text-gray-400 mb-4 uppercase tracking-wider">Uza na unganisha na database yako ya hosting (cPanel MySQL)</p>
+
+            <div class="space-y-3">
+              <div class="flex items-center justify-between p-3 bg-blue-950/30 border border-blue-900/50 rounded-xl mb-2">
+                <span class="text-xs text-white font-extrabold uppercase">TUMIA CPANEL SQL</span>
+                <label class="relative inline-flex items-center cursor-pointer">
+                  <input type="checkbox" id="cfg-cpanel-enabled" ${localStorage.getItem('cpanel_db_enabled') === 'true' ? 'checked' : ''} class="sr-only peer" />
+                  <div class="w-11 h-6 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-500"></div>
+                </label>
+              </div>
+              
+              <div>
+                <label class="block text-[9px] uppercase text-blue-400 font-extrabold mb-1 tracking-widest">cPanel PHP Bridge URL</label>
+                <input type="text" id="cfg-cpanel-url" value="${localStorage.getItem('cpanel_bridge_url') || ''}" placeholder="Mf: https://tovuti.com/selvix_cpanel_db.php" class="w-full p-2.5 rounded-lg cyber-input text-white text-xs font-bold" />
+              </div>
+              
+              <div>
+                <label class="block text-[9px] uppercase text-blue-400 font-extrabold mb-1 tracking-widest">Secret Verification Key (Neno la Siri la Soga)</label>
+                <input type="text" id="cfg-cpanel-key" value="${localStorage.getItem('cpanel_secret_key') || 'selvix_secure_key_123'}" class="w-full p-2.5 rounded-lg cyber-input text-white text-xs font-bold" />
+              </div>
+
+              <div class="grid grid-cols-2 gap-2 mt-4">
+                <button type="button" id="test-cpanel-btn" onclick="app.handleTestCpanelConnection()"
+                        class="py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-extrabold uppercase text-[9px] tracking-wider border border-gray-700 transition">
+                  <i class="fa-solid fa-vial-circle-check mr-1.5 text-blue-400"></i>Pima Muunganisho (Test)
+                </button>
+                <button type="button" onclick="alert('MAELEKEZO CPANEL SQL:\\n\\n1. Pakia faili la selvix_cpanel_db.php lililopo kwenye folda ya app yako kwenda kwenye hosting yako ya cPanel.\\n2. Fungua faili hilo na ujaze DB_USER, DB_PASS, DB_NAME na SECRET_KEY yako.\\n3. Weka URL yake hapa na uwashe kisha bonyeza Hifadhi.\\n\\nMfumo utajiendesha wenyewe kwa usalama wa hali ya juu!')"
+                        class="py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-extrabold uppercase text-[9px] tracking-wider border border-gray-700 transition">
+                  <i class="fa-solid fa-circle-info mr-1.5 text-yellow-400"></i>Soma Maelekezo
+                </button>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Master Save Button for Combined Database Settings -->
+        <div class="mt-6">
+          <button data-action="save-appwrite" 
+                  class="w-full py-4 rounded-2xl bg-gradient-to-r from-orange-600 via-yellow-500 to-blue-600 text-white font-black uppercase tracking-widest text-xs shadow-lg transform active:scale-[0.98] transition-all">
+            HIFADHI MIPANGO YOTE YA DATABASE (SAVE ALL)
+          </button>
         </div>
       `;
     } else if (this.adminTab === 'games') {
@@ -3268,9 +3388,13 @@ class SelvixApp {
           </h3>
           <p class="text-xs text-gray-400">Kubali muonekano unaoupenda kwa kubofya chaguzi hapa chini:</p>
           <div class="grid grid-cols-2 gap-2 pt-1">
+            <button data-action="change-theme" data-param="blue" 
+                    class="py-2.5 rounded-xl font-bold text-xs tracking-wider border transition-all duration-300 ${window.db.getActiveTheme() === 'blue' ? 'bg-gradient-to-r from-blue-600 to-sky-400 text-white shadow-lg border-blue-400' : 'bg-gray-800 text-gray-400 border-gray-700 hover:text-white'}">
+              BLUE (Default)
+            </button>
             <button data-action="change-theme" data-param="white-blend" 
                     class="py-2.5 rounded-xl font-bold text-xs tracking-wider border transition-all duration-300 ${window.db.getActiveTheme() === 'white-blend' ? 'bg-gradient-to-r from-red-500 to-orange-500 text-white shadow-lg border-orange-400' : 'bg-gray-800 text-gray-400 border-gray-700 hover:text-white'}">
-              WHITE BLEND (Default)
+              WHITE BLEND
             </button>
             <button data-action="change-theme" data-param="cyberpunk" 
                     class="py-2.5 rounded-xl font-bold text-xs tracking-wider border transition-all duration-300 ${window.db.getActiveTheme() === 'cyberpunk' ? 'bg-cyan-500 text-white shadow-glow-cyan border-cyan-400' : 'bg-gray-800 text-gray-400 border-gray-700 hover:text-white'}">
@@ -3396,5 +3520,19 @@ class SelvixApp {
     }
   }
 }
+
+window.navigateToMessages = function() {
+  if (window.app) {
+    window.app.showView('user-home');
+    window.app.activeTab = 'settings';
+    window.app.render();
+    setTimeout(() => {
+      const listEl = document.getElementById('notifications-list');
+      if (listEl) {
+        listEl.scrollIntoView({ behavior: 'smooth' });
+      }
+    }, 500);
+  }
+};
 
 window.app = new SelvixApp();
