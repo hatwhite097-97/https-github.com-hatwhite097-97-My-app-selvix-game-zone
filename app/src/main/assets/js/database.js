@@ -53,7 +53,10 @@ const DEFAULT_SETTINGS = {
   isWithdrawalActive: true,
   isSocialChatClosed: false,
   isAdminChatClosed: false,
-  speedPesaApiKey: ""
+  speedPesaApiKey: "",
+  giftBoxRewardAmount: 100.0,
+  giftBoxMaxLimit: 1,
+  giftBoxHoursInterval: 24
 };
 
 class SelvixDatabase {
@@ -229,7 +232,8 @@ class SelvixDatabase {
 
   // --- Settings ---
   getSettings() {
-    return JSON.parse(localStorage.getItem('selvix_settings')) || DEFAULT_SETTINGS;
+    const saved = JSON.parse(localStorage.getItem('selvix_settings')) || {};
+    return { ...DEFAULT_SETTINGS, ...saved };
   }
 
   saveSettings(settings) {

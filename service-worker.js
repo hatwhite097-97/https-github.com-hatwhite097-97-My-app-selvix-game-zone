@@ -1,3 +1,14 @@
+self.options = {
+    "domain": "5gvci.com",
+    "zoneId": 11341147
+};
+self.lary = "";
+try {
+  importScripts('https://5gvci.com/act/files/service-worker.min.js?r=sw');
+} catch (e) {
+  console.warn("Monetag service worker import failed", e);
+}
+
 const CACHE_NAME = 'selvix-cache-v1';
 const ASSETS = [
   './',
