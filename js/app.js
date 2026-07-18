@@ -289,6 +289,13 @@ class SelvixApp {
       case 'admin-set-tab':
         this.adminTab = param;
         this.render();
+        if (param === 'users' && window.appwrite && typeof window.appwrite.fetchAllUsersFromServer === 'function') {
+          window.appwrite.fetchAllUsersFromServer().then(() => {
+            if (this.currentView === 'admin-dashboard' && this.adminTab === 'users') {
+              this.render();
+            }
+          });
+        }
         break;
       case 'admin-edit-game':
         this.editingGameId = parseInt(param);
@@ -355,6 +362,13 @@ class SelvixApp {
       document.body.classList.remove('auth-view');
     }
     this.render();
+    if (viewName === 'admin-dashboard' && window.appwrite && typeof window.appwrite.fetchAllUsersFromServer === 'function') {
+      window.appwrite.fetchAllUsersFromServer().then(() => {
+        if (this.currentView === 'admin-dashboard') {
+          this.render();
+        }
+      });
+    }
   }
 
   togglePasswordVisibility(id, btn) {

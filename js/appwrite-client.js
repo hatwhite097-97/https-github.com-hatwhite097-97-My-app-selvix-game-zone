@@ -82,7 +82,7 @@ class SelvixAppwrite {
         // Handle post-redirect Google OAuth Session
         const { data: { session }, error } = await this.supabase.auth.getSession();
         
-        const handleSession = (session) => {
+        const handleSession = async (session) => {
           if (session && session.user) {
             const googleUser = session.user;
             let username = (googleUser.user_metadata?.full_name || googleUser.email?.split('@')[0] || "user")
@@ -90,6 +90,62 @@ class SelvixAppwrite {
               .replace(/[^a-z0-9]/g, '_');
             
             let localUser = window.db.getUser(username);
+            
+            // Try fetching existing user from cPanel if not found locally
+            if (!localUser && this.cpanelConfig.enabled) {
+              try {
+                const res = await this.callCpanelApi('get_user', { username: username });
+                if (res && res.success && res.data) {
+                  const d = res.data;
+                  localUser = {
+                    username: d.username,
+                    fullName: d.fullName || "Google User",
+                    phoneNumber: d.phoneNumber || "",
+                    password: d.password || "google_oauth_bypass",
+                    isAdmin: d.isAdmin || false,
+                    isBlockedFromChatting: d.isBlockedFromChatting || false,
+                    pointsBalance: parseFloat(d.pointsBalance) || 100.0,
+                    streakCount: parseInt(d.streakCount) || 0,
+                    lastRewardClaimedDate: d.lastRewardClaimedDate || "",
+                    referredBy: d.referredBy || "",
+                    createdDate: d.createdDate || new Date().toLocaleString()
+                  };
+                  window.db.saveUser(localUser);
+                }
+              } catch (e) {
+                console.warn("Error fetching Google user from cPanel:", e);
+              }
+            }
+            
+            // Try fetching existing user from Supabase if not found
+            if (!localUser && this.isActive && this.supabase) {
+              try {
+                const { data, error } = await this.supabase
+                  .from('users')
+                  .select('*')
+                  .eq('username', username)
+                  .maybeSingle();
+                if (data && !error) {
+                  localUser = {
+                    username: data.username,
+                    fullName: data.fullName || "Google User",
+                    phoneNumber: data.phoneNumber || "",
+                    password: data.password || "google_oauth_bypass",
+                    isAdmin: data.isAdmin || false,
+                    isBlockedFromChatting: data.isBlockedFromChatting || false,
+                    pointsBalance: parseFloat(data.pointsBalance) || 100.0,
+                    streakCount: parseInt(data.streakCount) || 0,
+                    lastRewardClaimedDate: data.lastRewardClaimedDate || "",
+                    referredBy: data.referredBy || "",
+                    createdDate: data.createdDate || new Date().toLocaleString()
+                  };
+                  window.db.saveUser(localUser);
+                }
+              } catch (e) {
+                console.warn("Error fetching Google user from Supabase:", e);
+              }
+            }
+            
             if (!localUser) {
               localUser = {
                 username: username,
@@ -125,9 +181,13 @@ class SelvixAppwrite {
             }
             window.db.setCurrentUser(localUser);
             
-            // Re-trigger visual rendering in app if it's already instantiated
+            // Re-trigger visual rendering in app and direct straight to their respective view
             if (window.app) {
-              window.app.showView('user-home');
+              if (localUser.isAdmin) {
+                window.app.showView('admin-dashboard');
+              } else {
+                window.app.showView('user-home');
+              }
             }
           }
         };
@@ -452,6 +512,65 @@ class SelvixAppwrite {
       } catch (e) {
         console.warn("Error syncing user to cPanel:", e);
       }
+    }
+    if (this.isActive && this.supabase) {
+      try {
+        await this.supabase.from('users').upsert([userObj]);
+      } catch (e) {
+        console.warn("Error syncing user to Supabase:", e);
+      }
+    }
+  }
+
+  async fetchAllUsersFromServer() {
+    let usersMap = {};
+    
+    // 1. Fetch from cPanel if enabled
+    if (this.cpanelConfig.enabled) {
+      try {
+        const res = await this.callCpanelApi('get_all_users');
+        if (res && res.success && res.data) {
+          usersMap = { ...usersMap, ...res.data };
+        }
+      } catch (e) {
+        console.warn("Error fetching all users from cPanel:", e);
+      }
+    }
+    
+    // 2. Fetch from Supabase if active
+    if (this.isActive && this.supabase) {
+      try {
+        const { data, error } = await this.supabase
+          .from('users')
+          .select('*');
+        if (data && !error) {
+          data.forEach(u => {
+            const usernameLower = u.username.toLowerCase();
+            usersMap[usernameLower] = {
+              username: u.username,
+              fullName: u.fullName || "User",
+              phoneNumber: u.phoneNumber || "",
+              password: u.password || "google_oauth_bypass",
+              isAdmin: u.isAdmin || false,
+              isBlockedFromChatting: u.isBlockedFromChatting || false,
+              pointsBalance: parseFloat(u.pointsBalance) || 0.0,
+              streakCount: parseInt(u.streakCount) || 0,
+              lastRewardClaimedDate: u.lastRewardClaimedDate || "",
+              referredBy: u.referredBy || "",
+              createdDate: u.createdDate || new Date().toLocaleString()
+            };
+          });
+        }
+      } catch (e) {
+        console.warn("Error fetching all users from Supabase:", e);
+      }
+    }
+    
+    // 3. Save to local storage
+    if (Object.keys(usersMap).length > 0) {
+      const localUsers = window.db.getUsers();
+      const updatedUsers = { ...localUsers, ...usersMap };
+      localStorage.setItem('selvix_users', JSON.stringify(updatedUsers));
     }
   }
 
