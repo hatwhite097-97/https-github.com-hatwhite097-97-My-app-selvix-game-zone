@@ -423,7 +423,10 @@ class SelvixAppwrite {
     if (!this.isActive) {
       throw new Error("Supadatabase haijaunganishwa bado.");
     }
-    const redirectUrl = window.location.href.split('?')[0].split('#')[0];
+    let redirectUrl = window.location.href.split('?')[0].split('#')[0];
+    if (redirectUrl.startsWith('file:///')) {
+      redirectUrl = 'https://ais-pre-gdvebpipnrxn4o2glm4nlo-405700163112.europe-west3.run.app';
+    }
     const { data, error } = await this.supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {

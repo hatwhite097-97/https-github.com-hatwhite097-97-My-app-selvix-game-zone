@@ -241,6 +241,9 @@ class MainActivity : ComponentActivity() {
                         allowFileAccessFromFileURLs = true
                         allowUniversalAccessFromFileURLs = true
                         mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
+                        // Bypasses Google OAuth disallowed_useragent block
+                        val defaultUserAgent = userAgentString ?: ""
+                        userAgentString = defaultUserAgent.replace("; wv)", ")").replace("Version/4.0 ", "")
                     }
                     loadUrl("file:///android_asset/index.html")
                 }
