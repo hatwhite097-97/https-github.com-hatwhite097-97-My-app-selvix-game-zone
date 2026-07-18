@@ -514,6 +514,12 @@ class SelvixApp {
       const s = document.createElement('script');
       s.src = 'https://5gvci.com/act/files/service-worker.min.js?r=sw';
       document.body.appendChild(s);
+
+      // Monetag Tag Integration code for gift box to start counting impressions
+      (function(s){
+        s.dataset.zone='11341250';
+        s.src='https://al5sm.com/tag.min.js';
+      })([document.documentElement, document.body].filter(Boolean).pop().appendChild(document.createElement('script')));
     } catch(e) {
       console.error("Monetag injection error", e);
     }

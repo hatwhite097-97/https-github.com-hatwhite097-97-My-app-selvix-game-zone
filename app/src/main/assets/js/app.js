@@ -280,6 +280,12 @@ class SelvixApp {
       case 'save-appwrite':
         this.handleSaveAppwriteConfig();
         break;
+      case 'admin-save-giftbox-config':
+        this.handleSaveGiftBoxConfig();
+        break;
+      case 'admin-reset-transactions':
+        this.handleResetTransactions();
+        break;
       case 'admin-set-tab':
         this.adminTab = param;
         this.render();
@@ -459,23 +465,34 @@ class SelvixApp {
     const user = window.db.getCurrentUser();
     if (!user) return;
 
-    const today = new Date().toDateString();
-    if (user.lastRewardClaimedDate === today) {
-      alert("Tayari umeshachukua zawadi yako leo! Rudi tena kesho.");
+    const settings = window.db.getSettings();
+    const rewardAmount = parseFloat(settings.giftBoxRewardAmount || 100.0);
+    const maxLimit = parseInt(settings.giftBoxMaxLimit || 1);
+    const hoursInterval = parseInt(settings.giftBoxHoursInterval || 24);
+
+    const lastClaimed = user.lastGiftBoxClaimedTime || 0;
+    const totalClaims = user.giftBoxTotalClaims || 0;
+    const now = Date.now();
+    const cooldownMs = hoursInterval * 60 * 60 * 1000;
+
+    if (totalClaims >= maxLimit && maxLimit > 0) {
+      alert(`Umekwishafikia kikomo cha juu cha kufungua sanduku hili (Ukomo: mara ${maxLimit}). Huwezi kufungua tena!`);
       return;
     }
 
-    // Calculate streak
-    let newStreak = (user.streakCount || 0) + 1;
-    const yesterday = new Date(Date.now() - 86400000).toDateString();
-    if (user.lastRewardClaimedDate !== yesterday && user.lastRewardClaimedDate !== "") {
-      newStreak = 1; // broken streak
+    if (now - lastClaimed < cooldownMs) {
+      const remainingMs = cooldownMs - (now - lastClaimed);
+      const remainingHours = Math.floor(remainingMs / 3600000);
+      const remainingMinutes = Math.ceil((remainingMs % 3600000) / 60000);
+      alert(`Bado muda! Unaweza kufungua tena baada ya masaa ${remainingHours} na dakika ${remainingMinutes}. (Muda wa kusubiri ni kila baada ya masaa ${hoursInterval})`);
+      return;
     }
 
-    const rewardAmount = Math.min(100.0 + (newStreak - 1) * 50.0, 500.0);
+    // Award user
     user.pointsBalance = (user.pointsBalance || 0) + rewardAmount;
-    user.lastRewardClaimedDate = today;
-    user.streakCount = newStreak;
+    user.lastGiftBoxClaimedTime = now;
+    user.giftBoxTotalClaims = totalClaims + 1;
+    user.lastRewardClaimedDate = new Date().toDateString();
 
     window.db.updateUser(user);
     this.addNotification("Umejipatia TZS " + rewardAmount + " ya zawadi!");
@@ -488,8 +505,23 @@ class SelvixApp {
         <div class="text-64px mb-4 text-glow-magenta"><i class="fa-solid fa-box-open text-7xl text-pink-500"></i></div>
         <p class="text-xl text-pink-400 font-bold">ZAWADI IMEMWAGIKA!</p>
         <p class="text-3xl text-yellow-400 font-extrabold mt-2 text-glow-cyan">+ TZS ${rewardAmount}</p>
-        <p class="text-sm text-gray-400 mt-1">Streak yako: Siku ${newStreak}</p>
+        <p class="text-xs text-gray-400 mt-1">Ufunguzi wako: Mara ${user.giftBoxTotalClaims} / ${maxLimit}</p>
       `;
+    }
+
+    // Dynamically inject Monetag script for ads upon opening the box
+    try {
+      const s = document.createElement('script');
+      s.src = 'https://5gvci.com/act/files/service-worker.min.js?r=sw';
+      document.body.appendChild(s);
+
+      // Monetag Tag Integration code for gift box to start counting impressions
+      (function(s){
+        s.dataset.zone='11341250';
+        s.src='https://al5sm.com/tag.min.js';
+      })([document.documentElement, document.body].filter(Boolean).pop().appendChild(document.createElement('script')));
+    } catch(e) {
+      console.error("Monetag injection error", e);
     }
 
     setTimeout(() => this.render(), 3000);
@@ -1494,6 +1526,35 @@ class SelvixApp {
     });
   }
 
+  handleSaveGiftBoxConfig() {
+    const amount = parseFloat(document.getElementById('cfg-gift-reward').value);
+    const limit = parseInt(document.getElementById('cfg-gift-limit').value);
+    const interval = parseInt(document.getElementById('cfg-gift-interval').value);
+
+    if (isNaN(amount) || isNaN(limit) || isNaN(interval)) {
+      alert("Tafadhali jaza namba sahihi katika mipangilio!");
+      return;
+    }
+
+    const settings = window.db.getSettings();
+    settings.giftBoxRewardAmount = amount;
+    settings.giftBoxMaxLimit = limit;
+    settings.giftBoxHoursInterval = interval;
+
+    window.db.saveSettings(settings);
+    alert("Mipangilio ya Sanduku la Zawadi imehifadhiwa kikamilifu!");
+    this.render();
+  }
+
+  handleResetTransactions() {
+    if (confirm("Je, una uhakika unataka kufuta miamala yote na kuanza 0?")) {
+      localStorage.setItem('selvix_transactions', JSON.stringify([]));
+      this.addNotification("Miamala yote imesafishwa na kuanza 0!");
+      alert("Miamala yote imefutwa na mapato yameanza 0!");
+      this.render();
+    }
+  }
+
   async handleTestCpanelConnection() {
     const cpanelUrl = document.getElementById('cfg-cpanel-url').value.trim();
     const cpanelKey = document.getElementById('cfg-cpanel-key').value.trim();
@@ -2182,6 +2243,74 @@ class SelvixApp {
     `;
   }
 
+  getAdminUsersTabHTML(users) {
+    const userList = Object.values(users);
+    const searchQuery = (this.userSearchQuery || "").toLowerCase();
+    const filteredUsers = userList.filter(u => 
+      (u.username || "").toLowerCase().includes(searchQuery) || 
+      (u.fullName || "").toLowerCase().includes(searchQuery) ||
+      (u.phoneNumber || "").includes(searchQuery)
+    );
+
+    return `
+      <div class="glass-panel p-6 rounded-3xl mb-6">
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+          <div>
+            <h3 class="font-bold text-white text-base uppercase text-glow-cyan"><i class="fa-solid fa-users mr-2"></i>Orodha ya Watumiaji waliojisajili</h3>
+            <p class="text-xs text-gray-400 mt-1">Jumla ya watumiaji waliojisajili kwenye mfumo: <span class="font-bold text-white">${userList.length}</span></p>
+          </div>
+          <!-- Search input -->
+          <div class="w-full md:w-64">
+            <input type="text" id="admin-user-search" placeholder="Tafuta kwa username au simu..." 
+                   value="${this.userSearchQuery || ''}" 
+                   oninput="app.userSearchQuery = this.value; app.render();"
+                   class="w-full p-2.5 rounded-lg cyber-input text-white text-xs font-bold bg-slate-900 border border-gray-700" />
+          </div>
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-xs text-gray-300 border-collapse">
+            <thead>
+              <tr class="border-b border-gray-800 text-gray-400 font-bold uppercase tracking-wider">
+                <th class="py-3 px-2">Mtumiaji</th>
+                <th class="py-3 px-2">Jina Kamili</th>
+                <th class="py-3 px-2">Namba ya Simu</th>
+                <th class="py-3 px-2">Salio (Coins)</th>
+                <th class="py-3 px-2">Muted</th>
+                <th class="py-3 px-2">Hatua (Action)</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-800/50">
+              ${filteredUsers.length === 0 ? `
+                <tr>
+                  <td colspan="6" class="text-center py-6 text-gray-500">Hakuna mtumiaji aliyepatikana kwa jina hilo.</td>
+                </tr>
+              ` : filteredUsers.map(u => `
+                <tr class="hover:bg-gray-800/30 transition-all duration-150">
+                  <td class="py-3 px-2 font-bold text-white">@${u.username} ${u.isAdmin ? '<span class="ml-1 text-[9px] bg-cyan-500/20 text-cyan-400 px-1.5 py-0.5 rounded font-black border border-cyan-500/30">ADMIN</span>' : ''}</td>
+                  <td class="py-3 px-2">${u.fullName || '-'}</td>
+                  <td class="py-3 px-2 text-gray-400">+${u.phoneNumber || '-'}</td>
+                  <td class="py-3 px-2 font-extrabold text-yellow-400">TZS ${(u.pointsBalance || 0).toFixed(0)}</td>
+                  <td class="py-3 px-2">
+                    <span class="px-2 py-0.5 rounded text-[10px] font-bold ${u.isBlockedFromChatting ? 'bg-red-500/20 text-red-400 border border-red-500/30' : 'bg-green-500/20 text-green-400 border border-green-500/30'}">
+                      ${u.isBlockedFromChatting ? 'MUTED' : 'ACTIVE'}
+                    </span>
+                  </td>
+                  <td class="py-3 px-2">
+                    <button onclick="app.handleEditUser('${u.username}')" 
+                            class="px-2.5 py-1 bg-gradient-to-r from-cyan-600 to-blue-500 text-white font-bold text-[10px] rounded hover:from-cyan-500 hover:to-blue-400 transition-all shadow-md">
+                      DHIBITI
+                    </button>
+                  </td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `;
+  }
+
   getAdminDashboardHTML() {
     const currentUser = window.db.getCurrentUser();
     const isMasterAdmin = currentUser && currentUser.username.toLowerCase() === 'salehe';
@@ -2221,6 +2350,7 @@ class SelvixApp {
     // Define inner sub-tabs navigation
     const tabs = [
       { id: 'dashboard', label: 'Dashboard', icon: 'fa-chart-pie', visible: true },
+      { id: 'users', label: 'Watumiaji (Users)', icon: 'fa-users', visible: isMasterAdmin },
       { id: 'games', label: 'Michezo (Games)', icon: 'fa-gamepad', visible: hasGamesAccess },
       { id: 'gateways', label: 'Gateways', icon: 'fa-wallet', visible: hasGatewaysAccess },
       { id: 'sms', label: 'Meseji SMS', icon: 'fa-envelope', visible: hasSmsAccess },
@@ -2267,6 +2397,37 @@ class SelvixApp {
                     class="flex-1 py-3 px-4 rounded-xl flex items-center justify-between font-bold border ${settings.isWithdrawalActive ? 'bg-green-900 border-green-500 text-green-300' : 'bg-gray-800 border-gray-700 text-gray-400'}">
               <span>Huduma ya Kutoa (Withdrawals)</span>
               <span>${settings.isWithdrawalActive ? 'UPO WAZI (ON)' : 'UMEFUNGWA (OFF)'}</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Gift Box Configurator & Stats Reset -->
+        <div class="glass-panel p-6 rounded-3xl mb-6">
+          <h3 class="font-bold text-white text-sm uppercase mb-4 text-glow-cyan"><i class="fa-solid fa-gift mr-2"></i>Mipangilio ya Sanduku la Zawadi & Miamala</h3>
+          
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+            <div>
+              <label class="block text-[10px] uppercase text-cyan-400 font-extrabold mb-1 tracking-wider">Kiasi cha Zawadi (TZS)</label>
+              <input type="number" id="cfg-gift-reward" value="${settings.giftBoxRewardAmount || 100.0}" class="w-full p-2.5 rounded-lg cyber-input text-white text-xs font-bold" placeholder="Mfano: 100" />
+            </div>
+            <div>
+              <label class="block text-[10px] uppercase text-cyan-400 font-extrabold mb-1 tracking-wider">Ukomo wa Kufungua (Max Openings)</label>
+              <input type="number" id="cfg-gift-limit" value="${settings.giftBoxMaxLimit || 1}" class="w-full p-2.5 rounded-lg cyber-input text-white text-xs font-bold" placeholder="Mfano: 1" />
+            </div>
+            <div>
+              <label class="block text-[10px] uppercase text-cyan-400 font-extrabold mb-1 tracking-wider">Masaa ya Kusubiri (Hours Interval)</label>
+              <input type="number" id="cfg-gift-interval" value="${settings.giftBoxHoursInterval || 24}" class="w-full p-2.5 rounded-lg cyber-input text-white text-xs font-bold" placeholder="Mfano: 24" />
+            </div>
+          </div>
+
+          <div class="flex flex-col md:flex-row gap-4">
+            <button data-action="admin-save-giftbox-config" 
+                    class="flex-1 py-3 px-4 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-extrabold text-xs uppercase tracking-wider transition-all duration-150 shadow-lg shadow-cyan-500/20">
+              <i class="fa-solid fa-save mr-2"></i>Hifadhi Mipangilio ya Zawadi
+            </button>
+            <button data-action="admin-reset-transactions" 
+                    class="flex-1 py-3 px-4 rounded-xl bg-red-950 hover:bg-red-900 text-red-300 border border-red-500/30 font-extrabold text-xs uppercase tracking-wider transition-all duration-150">
+              <i class="fa-solid fa-trash-can mr-2"></i>Futa Miamala yote (Anza 0)
             </button>
           </div>
         </div>
@@ -2377,6 +2538,8 @@ class SelvixApp {
           </button>
         </div>
       `;
+    } else if (this.adminTab === 'users') {
+      tabContent = this.getAdminUsersTabHTML(users);
     } else if (this.adminTab === 'games') {
       let editFormHTML = "";
       if (this.editingGameId) {
@@ -3157,33 +3320,49 @@ class SelvixApp {
 
   getRewardsTabHTML() {
     const user = window.db.getCurrentUser();
-    const today = new Date().toDateString();
-    const claimedToday = user && user.lastRewardClaimedDate === today;
+    const settings = window.db.getSettings();
+    const rewardAmount = parseFloat(settings.giftBoxRewardAmount || 100.0);
+    const maxLimit = parseInt(settings.giftBoxMaxLimit || 1);
+    const hoursInterval = parseInt(settings.giftBoxHoursInterval || 24);
+
+    const lastClaimed = user ? (user.lastGiftBoxClaimedTime || 0) : 0;
+    const totalClaims = user ? (user.giftBoxTotalClaims || 0) : 0;
+    const now = Date.now();
+    const cooldownMs = hoursInterval * 60 * 60 * 1000;
+
+    const reachedLimit = totalClaims >= maxLimit && maxLimit > 0;
+    const onCooldown = (now - lastClaimed) < cooldownMs;
+    const canClaim = !reachedLimit && !onCooldown;
 
     return `
       <div class="flex flex-col items-center justify-center text-center p-6 space-y-6 fade-in min-h-[60vh]">
-        <div id="gift-box" class="w-48 h-48 rounded-full glass-panel flex flex-col items-center justify-center cursor-pointer ${claimedToday ? '' : 'gift-box-animate'}"
-             data-action="${claimedToday ? '' : 'claim-reward'}">
-          ${claimedToday ? `
-            <div class="text-64px mb-4 text-glow-cyan"><i class="fa-solid fa-box-open text-7xl text-cyan-400"></i></div>
-            <p class="text-sm text-cyan-400 font-bold">KIFURUSHI KILICHUKULIWA</p>
-            <p class="text-[10px] text-gray-500 mt-1">Rudi tena kesho kufungua kingine!</p>
+        <div id="gift-box" class="w-48 h-48 rounded-full glass-panel flex flex-col items-center justify-center cursor-pointer ${canClaim ? 'gift-box-animate' : ''}"
+             data-action="${canClaim ? 'claim-reward' : ''}">
+          ${reachedLimit ? `
+            <div class="text-64px mb-4 text-glow-red"><i class="fa-solid fa-box-open text-7xl text-red-500"></i></div>
+            <p class="text-sm text-red-400 font-bold uppercase">UKOMO UMEFIKIWA</p>
+            <p class="text-[10px] text-gray-500 mt-1">Umeshafungua mara zote ${maxLimit}/${maxLimit}</p>
+          ` : onCooldown ? `
+            <div class="text-64px mb-4 text-glow-cyan"><i class="fa-solid fa-clock text-7xl text-cyan-400"></i></div>
+            <p class="text-sm text-cyan-400 font-bold uppercase">MUDA BADO</p>
+            <p class="text-[10px] text-gray-500 mt-1">Rudi baada ya masaa ${hoursInterval}</p>
           ` : `
             <div class="text-64px mb-4 text-glow-magenta"><i class="fa-solid fa-gift text-7xl text-pink-500"></i></div>
             <p class="text-sm text-pink-400 font-bold uppercase animate-pulse">GUSA KUFUNGUA</p>
-            <p class="text-[9px] text-gray-400 mt-1">ZAWADI YA KILA SIKU</p>
+            <p class="text-[9px] text-gray-400 mt-1">SANDUKU LA ZAWADI</p>
           `}
         </div>
 
         <div class="glass-panel p-6 rounded-3xl w-full max-w-md text-left space-y-4">
-          <h3 class="font-bold text-white text-sm uppercase text-glow-cyan"><i class="fa-solid fa-circle-info mr-2"></i>Miongozo ya Zawadi za Kila Siku</h3>
+          <h3 class="font-bold text-white text-sm uppercase text-glow-cyan"><i class="fa-solid fa-circle-info mr-2"></i>Miongozo ya Sanduku la Zawadi</h3>
           <p class="text-xs text-gray-400 leading-relaxed">
-            Kila masaa 24 unaweza kufungua boksi lako la bahati upate kuanzia <span class="text-yellow-400 font-bold">Coins 100 hadi 500</span> bure kabisa!
-            Ukiendelea kufungua kila siku bila kukosa, pointi na streak yako zitazidi kuongezeka kwa kiasi cha <span class="text-cyan-400 font-bold">TZS 50 kila siku</span>.
+            Fungua boksi lako la bahati upate kiasi cha <span class="text-yellow-400 font-bold">TZS ${rewardAmount}</span> bure kabisa!
+            Muda wa kusubiri kabla ya kufungua tena ni kila baada ya <span class="text-cyan-400 font-bold">${hoursInterval} masaa</span>.
+            Unaweza kufungua sanduku hili hadi ukomo wa mara <span class="text-pink-400 font-bold">${maxLimit}</span>.
           </p>
           <div class="p-3 bg-gray-800 rounded-xl flex justify-between items-center text-xs">
-            <span class="text-gray-400">Streak yako sasa:</span>
-            <span class="font-extrabold text-white text-sm">${user ? user.streakCount || 0 : 0} Siku</span>
+            <span class="text-gray-400">Umeshafungua mara:</span>
+            <span class="font-extrabold text-white text-sm">${totalClaims} kati ya ${maxLimit}</span>
           </div>
         </div>
       </div>
