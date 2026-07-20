@@ -66,13 +66,7 @@ class SelvixAppwrite {
   }
 
   async init() {
-    if (this.cpanelConfig.enabled) {
-      console.log("cPanel SQL Database active. Supadatabase (Supabase) is disabled as requested.");
-      this.isActive = false;
-      // Bypassed Supabase completely!
-      return;
-    }
-
+    // 1. Initialize Supabase if credentials exist (Always initialize so Supabase Auth & Google Sign-In work seamlessly)
     if (this.config.endpoint && this.config.projectId && window.supabase) {
       try {
         this.supabase = window.supabase.createClient(this.config.endpoint, this.config.configId || this.config.projectId);
@@ -209,6 +203,12 @@ class SelvixAppwrite {
       console.log("Supadatabase (Supabase) is running in high-performance Local Mode.");
       this.isActive = false;
     }
+
+    // Trigger non-blocking sync on startup from whoever is enabled/active!
+    this.fetchAllUsersFromServer().catch(e => console.warn(e));
+    this.fetchAllGamesFromServer().catch(e => console.warn(e));
+    this.fetchAllChatsFromServer().catch(e => console.warn(e));
+    this.fetchAllTransactionsFromServer().catch(e => console.warn(e));
   }
 
   updateConfig(newConfig) {
@@ -592,6 +592,189 @@ class SelvixAppwrite {
         console.warn("Error syncing transaction to Supabase:", e);
       }
     }
+  }
+
+  async syncGame(gameObj) {
+    if (this.cpanelConfig.enabled) {
+      try {
+        await this.callCpanelApi('save_game', {}, 'POST', gameObj);
+      } catch (e) {
+        console.warn("Error syncing game to cPanel:", e);
+      }
+    }
+    if (this.isActive && this.supabase) {
+      try {
+        await this.supabase.from('selvix_games').upsert([gameObj]);
+      } catch (e) {
+        console.warn("Error syncing game to Supabase:", e);
+      }
+    }
+  }
+
+  async deleteGameFromServer(gameId) {
+    if (this.cpanelConfig.enabled) {
+      try {
+        await this.callCpanelApi('delete_game', { id: gameId }, 'POST');
+      } catch (e) {
+        console.warn("Error deleting game on cPanel:", e);
+      }
+    }
+    if (this.isActive && this.supabase) {
+      try {
+        await this.supabase.from('selvix_games').delete().eq('id', gameId);
+      } catch (e) {
+        console.warn("Error deleting game on Supabase:", e);
+      }
+    }
+  }
+
+  async syncChatMessage(chatObj) {
+    if (this.cpanelConfig.enabled) {
+      try {
+        await this.callCpanelApi('save_chat', {}, 'POST', chatObj);
+      } catch (e) {
+        console.warn("Error syncing chat to cPanel:", e);
+      }
+    }
+    if (this.isActive && this.supabase) {
+      try {
+        await this.supabase.from('selvix_chats').upsert([chatObj]);
+      } catch (e) {
+        console.warn("Error syncing chat to Supabase:", e);
+      }
+    }
+  }
+
+  async deleteChatMessageFromServer(chatId) {
+    if (this.cpanelConfig.enabled) {
+      try {
+        await this.callCpanelApi('delete_chat', { id: chatId }, 'POST');
+      } catch (e) {
+        console.warn("Error deleting chat on cPanel:", e);
+      }
+    }
+    if (this.isActive && this.supabase) {
+      try {
+        await this.supabase.from('selvix_chats').delete().eq('id', chatId);
+      } catch (e) {
+        console.warn("Error deleting chat on Supabase:", e);
+      }
+    }
+  }
+
+  async fetchAllGamesFromServer() {
+    let gamesList = [];
+    if (this.cpanelConfig.enabled) {
+      try {
+        const res = await this.callCpanelApi('get_all_games');
+        if (res && res.success && Array.isArray(res.data)) {
+          gamesList = res.data;
+        }
+      } catch (e) {
+        console.warn("Error fetching games from cPanel:", e);
+      }
+    }
+    if (this.isActive && this.supabase && gamesList.length === 0) {
+      try {
+        const { data, error } = await this.supabase.from('selvix_games').select('*').order('id', { ascending: true });
+        if (data && !error) {
+          gamesList = data;
+        }
+      } catch (e) {
+        console.warn("Error fetching games from Supabase:", e);
+      }
+    }
+    if (gamesList.length > 0) {
+      localStorage.setItem('selvix_games', JSON.stringify(gamesList));
+    }
+  }
+
+  async fetchAllChatsFromServer() {
+    let chatsList = [];
+    if (this.cpanelConfig.enabled) {
+      try {
+        const res = await this.callCpanelApi('get_all_chats');
+        if (res && res.success && Array.isArray(res.data)) {
+          chatsList = res.data;
+        }
+      } catch (e) {
+        console.warn("Error fetching chats from cPanel:", e);
+      }
+    }
+    if (this.isActive && this.supabase && chatsList.length === 0) {
+      try {
+        const { data, error } = await this.supabase.from('selvix_chats').select('*').order('id', { ascending: true });
+        if (data && !error) {
+          chatsList = data;
+        }
+      } catch (e) {
+        console.warn("Error fetching chats from Supabase:", e);
+      }
+    }
+    if (chatsList.length > 0) {
+      localStorage.setItem('selvix_chats', JSON.stringify(chatsList));
+    }
+  }
+
+  async fetchAllTransactionsFromServer() {
+    let txsList = [];
+    if (this.cpanelConfig.enabled) {
+      try {
+        const res = await this.callCpanelApi('get_all_transactions');
+        if (res && res.success && Array.isArray(res.data)) {
+          txsList = res.data;
+        }
+      } catch (e) {
+        console.warn("Error fetching transactions from cPanel:", e);
+      }
+    }
+    if (this.isActive && this.supabase && txsList.length === 0) {
+      try {
+        const { data, error } = await this.supabase.from('selvix_transactions').select('*');
+        if (data && !error) {
+          txsList = data;
+        }
+      } catch (e) {
+        console.warn("Error fetching transactions from Supabase:", e);
+      }
+    }
+    if (txsList.length > 0) {
+      localStorage.setItem('selvix_transactions', JSON.stringify(txsList));
+    }
+  }
+
+  async checkConnections() {
+    let supabaseStatus = "Disconnected";
+    let cpanelStatus = "Disconnected";
+    
+    if (this.isActive && this.supabase) {
+      try {
+        const { data, error } = await this.supabase.from('users').select('username').limit(1);
+        if (error) {
+          console.warn("Supabase connection check failed:", error);
+          supabaseStatus = "Error: " + error.message;
+        } else {
+          supabaseStatus = "Connected";
+        }
+      } catch (e) {
+        supabaseStatus = "Error: " + e.message;
+      }
+    }
+    
+    if (this.cpanelConfig.enabled && this.cpanelConfig.bridgeUrl) {
+      try {
+        const res = await this.callCpanelApi('ping');
+        if (res && res.success) {
+          cpanelStatus = "Connected";
+        } else {
+          cpanelStatus = "Error: " + (res?.message || "Unknown error");
+        }
+      } catch (e) {
+        cpanelStatus = "Error: " + e.message;
+      }
+    }
+    
+    return { supabaseStatus, cpanelStatus };
   }
 
   async callPaymentFunction(endpointName, payload) {

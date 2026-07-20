@@ -27,6 +27,8 @@ define('SUPABASE_SERVICE_ROLE_KEY', !empty($envKey) ? $envKey : 'WEKA_SERVICE_RO
 // Majina ya Tables kwenye Supabase
 define('SUPABASE_USERS_TABLE', 'users');
 define('SUPABASE_TXS_TABLE', 'selvix_transactions');
+define('SUPABASE_GAMES_TABLE', 'selvix_games');
+define('SUPABASE_CHATS_TABLE', 'selvix_chats');
 
 // Weka neno la siri la kulinda usalama (Secret Key) linalolingana na lile la Admin Panel ya Selvix
 define('SECRET_KEY', 'selvix_secure_key_123'); 
@@ -244,10 +246,137 @@ switch ($action) {
         }
         break;
 
+    case 'get_all_games':
+        $res = callSupabase('/rest/v1/' . SUPABASE_GAMES_TABLE . '?select=*&order=id.asc', 'GET');
+        if ($res['code'] >= 200 && $res['code'] < 300) {
+            $data = json_decode($res['response'], true);
+            if (is_array($data)) {
+                foreach ($data as &$row) {
+                    $row['id'] = (int)$row['id'];
+                    $row['isPaid'] = filter_var($row['isPaid'], FILTER_VALIDATE_BOOLEAN);
+                    $row['price'] = (float)$row['price'];
+                }
+            }
+            echo json_encode(["success" => true, "data" => $data]);
+        } else {
+            echo json_encode(["success" => false, "message" => "Kosa la Supabase (HTTP " . $res['code'] . "): " . $res['response']]);
+        }
+        break;
+
+    case 'save_game':
+        $rawData = json_decode(file_get_contents("php://input"), true);
+        if (!$rawData || !isset($rawData['id'])) {
+            echo json_encode(["success" => false, "message" => "Data za mchezo hazijakamilika"]);
+            break;
+        }
+        $payload = [
+            "id" => (int)$rawData['id'],
+            "title" => trim($rawData['title']),
+            "imageUrl" => trim($rawData['imageUrl']),
+            "category" => trim($rawData['category']),
+            "isPaid" => isset($rawData['isPaid']) ? filter_var($rawData['isPaid'], FILTER_VALIDATE_BOOLEAN) : false,
+            "price" => isset($rawData['price']) ? (float)$rawData['price'] : 0.00,
+            "downloadUrl" => trim($rawData['downloadUrl']),
+            "description" => isset($rawData['description']) ? trim($rawData['description']) : ''
+        ];
+        $extraHeaders = ["Prefer: resolution=merge-duplicates"];
+        $res = callSupabase('/rest/v1/' . SUPABASE_GAMES_TABLE, 'POST', $payload, $extraHeaders);
+        if ($res['code'] >= 200 && $res['code'] < 300) {
+            echo json_encode(["success" => true, "message" => "Mchezo umehifadhiwa/kusawazishwa."]);
+        } else {
+            echo json_encode(["success" => false, "message" => "Kosa la kuhifadhi mchezo (HTTP " . $res['code'] . "): " . $res['response']]);
+        }
+        break;
+
+    case 'delete_game':
+        $rawData = json_decode(file_get_contents("php://input"), true);
+        $id = isset($rawData['id']) ? (int)$rawData['id'] : (isset($_GET['id']) ? (int)$_GET['id'] : 0);
+        if (!$id) {
+            echo json_encode(["success" => false, "message" => "ID ya mchezo haijatolewa"]);
+            break;
+        }
+        $res = callSupabase('/rest/v1/' . SUPABASE_GAMES_TABLE . '?id=eq.' . $id, 'DELETE');
+        if ($res['code'] >= 200 && $res['code'] < 300) {
+            echo json_encode(["success" => true, "message" => "Mchezo umefutwa."]);
+        } else {
+            echo json_encode(["success" => false, "message" => "Kosa la kufuta mchezo (HTTP " . $res['code'] . "): " . $res['response']]);
+        }
+        break;
+
+    case 'get_all_chats':
+        $res = callSupabase('/rest/v1/' . SUPABASE_CHATS_TABLE . '?select=*&order=id.asc', 'GET');
+        if ($res['code'] >= 200 && $res['code'] < 300) {
+            $data = json_decode($res['response'], true);
+            if (is_array($data)) {
+                foreach ($data as &$row) {
+                    $row['id'] = (int)$row['id'];
+                    $row['isSocial'] = filter_var($row['isSocial'], FILTER_VALIDATE_BOOLEAN);
+                }
+            }
+            echo json_encode(["success" => true, "data" => $data]);
+        } else {
+            echo json_encode(["success" => false, "message" => "Kosa la Supabase (HTTP " . $res['code'] . "): " . $res['response']]);
+        }
+        break;
+
+    case 'save_chat':
+        $rawData = json_decode(file_get_contents("php://input"), true);
+        if (!$rawData || !isset($rawData['id'])) {
+            echo json_encode(["success" => false, "message" => "Data za soga hazijakamilika"]);
+            break;
+        }
+        $payload = [
+            "id" => (int)$rawData['id'],
+            "senderUsername" => trim($rawData['senderUsername']),
+            "senderFullName" => trim($rawData['senderFullName']),
+            "message" => trim($rawData['message']),
+            "isSocial" => isset($rawData['isSocial']) ? filter_var($rawData['isSocial'], FILTER_VALIDATE_BOOLEAN) : true,
+            "timestamp" => isset($rawData['timestamp']) ? trim($rawData['timestamp']) : date('Y-m-d H:i:s')
+        ];
+        $extraHeaders = ["Prefer: resolution=merge-duplicates"];
+        $res = callSupabase('/rest/v1/' . SUPABASE_CHATS_TABLE, 'POST', $payload, $extraHeaders);
+        if ($res['code'] >= 200 && $res['code'] < 300) {
+            echo json_encode(["success" => true, "message" => "Ujumbe umehifadhiwa."]);
+        } else {
+            echo json_encode(["success" => false, "message" => "Kosa la kuhifadhi ujumbe (HTTP " . $res['code'] . "): " . $res['response']]);
+        }
+        break;
+
+    case 'delete_chat':
+        $rawData = json_decode(file_get_contents("php://input"), true);
+        $id = isset($rawData['id']) ? (int)$rawData['id'] : (isset($_GET['id']) ? (int)$_GET['id'] : 0);
+        if (!$id) {
+            echo json_encode(["success" => false, "message" => "ID ya ujumbe haijatolewa"]);
+            break;
+        }
+        $res = callSupabase('/rest/v1/' . SUPABASE_CHATS_TABLE . '?id=eq.' . $id, 'DELETE');
+        if ($res['code'] >= 200 && $res['code'] < 300) {
+            echo json_encode(["success" => true, "message" => "Ujumbe umefutwa."]);
+        } else {
+            echo json_encode(["success" => false, "message" => "Kosa la kufuta ujumbe (HTTP " . $res['code'] . "): " . $res['response']]);
+        }
+        break;
+
+    case 'get_all_transactions':
+        $res = callSupabase('/rest/v1/' . SUPABASE_TXS_TABLE . '?select=*', 'GET');
+        if ($res['code'] >= 200 && $res['code'] < 300) {
+            $data = json_decode($res['response'], true);
+            if (is_array($data)) {
+                foreach ($data as &$row) {
+                    $row['gameId'] = (int)$row['gameId'];
+                    $row['amount'] = (float)$row['amount'];
+                }
+            }
+            echo json_encode(["success" => true, "data" => $data]);
+        } else {
+            echo json_encode(["success" => false, "message" => "Kosa la Supabase (HTTP " . $res['code'] . "): " . $res['response']]);
+        }
+        break;
+
     default:
         echo json_encode([
             "success" => false,
-            "message" => "Action haitambuliwi. Jaribu ping, get_user, au save_user."
+            "message" => "Action haitambuliwi. Jaribu ping, get_user, save_user, au get_all_games."
         ]);
         break;
 }

@@ -1609,6 +1609,40 @@ class SelvixApp {
     }
   }
 
+  async handleTestSupabaseConnection() {
+    const endpoint = document.getElementById('cfg-endpoint').value.trim();
+    const projectId = document.getElementById('cfg-project').value.trim();
+    if (!endpoint || !projectId) {
+      alert("Tafadhali weka URL na Anon Key ya Supadatabase kwanza!");
+      return;
+    }
+    
+    const testBtn = document.getElementById('test-supabase-btn');
+    if (testBtn) {
+      testBtn.innerHTML = '<i class="fa-solid fa-spinner animate-spin mr-2"></i>Inapima...';
+      testBtn.disabled = true;
+    }
+
+    try {
+      // Create temporary client to test
+      const tempSupabase = window.supabase.createClient(endpoint, projectId);
+      const { data, error } = await tempSupabase.from('users').select('username').limit(1);
+      
+      if (error) {
+        throw error;
+      }
+      
+      alert("HONGERA!\n\nMuunganisho wa Supadatabase (Supabase) unafanya kazi vizuri sana!");
+    } catch (err) {
+      alert("IMEFAILI!\n\nKosa la Muunganisho wa Supabase:\n" + err.message + "\n\nHakikisha umeunda Table ya 'users' kwenye Supabase yako.");
+    } finally {
+      if (testBtn) {
+        testBtn.innerHTML = '<i class="fa-solid fa-vial-circle-check mr-1.5 text-orange-400"></i>Pima Supabase';
+        testBtn.disabled = false;
+      }
+    }
+  }
+
   // --- RENDERING VIEWS ---
   render() {
     const root = document.getElementById('app-root');
@@ -2477,11 +2511,15 @@ class SelvixApp {
           
           <!-- Supadatabase System Configurator -->
           <div class="glass-panel p-6 rounded-3xl border border-orange-500/30 bg-gradient-to-br from-gray-900 to-[#1e130c]">
-            <h3 class="font-bold text-white text-sm uppercase mb-2 text-glow-cyan">
+            <h3 class="font-bold text-white text-sm uppercase mb-1 text-glow-cyan">
               <i class="fa-solid fa-cloud mr-2 text-orange-500 animate-pulse"></i>SUPADATABASE CLOUD INTEGRATION
             </h3>
-            <p class="text-[10px] text-gray-400 mb-4 uppercase tracking-wider">Hifadhi ya Wingu la Supabase (Mbadala wa Appwrite)</p>
+            <p class="text-[10px] text-gray-400 mb-2 uppercase tracking-wider">Hifadhi ya Wingu la Supabase (Mbadala wa Appwrite)</p>
             
+            <div id="supabase-status-badge" class="mb-4 flex items-center">
+              <span class="px-2 py-0.5 rounded text-[9px] font-black bg-yellow-500/20 text-yellow-400 border border-yellow-500/30 animate-pulse">INAKAGUA MUUNGANISHO...</span>
+            </div>
+
             <div class="space-y-3">
               <div>
                 <label class="block text-[9px] uppercase text-orange-500 font-extrabold mb-1 tracking-widest">Supadatabase API URL</label>
@@ -2495,9 +2533,17 @@ class SelvixApp {
                 <label class="block text-[9px] uppercase text-orange-500 font-extrabold mb-1 tracking-widest">Database ID (Prefix/Schema)</label>
                 <input type="text" id="cfg-dbid" value="${window.appwrite.config.databaseId}" class="w-full p-2.5 rounded-lg cyber-input text-white text-xs font-bold" />
               </div>
+              
+              <div class="grid grid-cols-1 gap-2 mt-4">
+                <button type="button" id="test-supabase-btn" onclick="app.handleTestSupabaseConnection()"
+                        class="w-full py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-extrabold uppercase text-[9px] tracking-wider border border-gray-700 transition">
+                  <i class="fa-solid fa-vial-circle-check mr-1.5 text-orange-400"></i>Pima Supabase (Test)
+                </button>
+              </div>
+
               <div class="p-3 bg-orange-950/20 border border-orange-900/40 rounded-xl">
                 <p class="text-[10px] text-orange-400 font-bold leading-relaxed">
-                  * Kama ukiwasha cPanel SQL hapa chini, mfumo wa Supadatabase utazimwa moja kwa moja na kutumia cPanel yako!
+                  * Mfumo utatumia hifadhi ya Supabase kujiendesha ikiwa imewekwa vizuri. Hakikisha umeunda tables zote.
                 </p>
               </div>
             </div>
@@ -2505,10 +2551,14 @@ class SelvixApp {
 
           <!-- cPanel SQL System Configurator -->
           <div class="glass-panel p-6 rounded-3xl border border-blue-500/30 bg-gradient-to-br from-gray-900 to-[#0b1b3a]">
-            <h3 class="font-bold text-white text-sm uppercase mb-2 text-glow-cyan">
+            <h3 class="font-bold text-white text-sm uppercase mb-1 text-glow-cyan">
               <i class="fa-solid fa-server mr-2 text-blue-400"></i>CPANEL SQL INTEGRATION (DATABASE YA CPANEL)
             </h3>
-            <p class="text-[10px] text-gray-400 mb-4 uppercase tracking-wider">Uza na unganisha na database yako ya hosting (cPanel MySQL)</p>
+            <p class="text-[10px] text-gray-400 mb-2 uppercase tracking-wider">Uza na unganisha na database yako ya hosting (cPanel MySQL)</p>
+
+            <div id="cpanel-status-badge" class="mb-4 flex items-center">
+              <span class="px-2 py-0.5 rounded text-[9px] font-black bg-yellow-500/20 text-yellow-400 border border-yellow-500/30 animate-pulse">INAKAGUA MUUNGANISHO...</span>
+            </div>
 
             <div class="space-y-3">
               <div class="flex items-center justify-between p-3 bg-blue-950/30 border border-blue-900/50 rounded-xl mb-2">
@@ -2543,6 +2593,32 @@ class SelvixApp {
           </div>
 
         </div>
+
+        <script>
+          setTimeout(async () => {
+            if (window.appwrite) {
+              const statuses = await window.appwrite.checkConnections();
+              const supBadge = document.getElementById('supabase-status-badge');
+              const cpBadge = document.getElementById('cpanel-status-badge');
+              
+              if (supBadge) {
+                if (statuses.supabaseStatus === 'Connected') {
+                  supBadge.innerHTML = '<span class="px-2 py-0.5 rounded text-[9px] font-black bg-green-500/20 text-green-400 border border-green-500/30">KIMEUNGANISHWA (CONNECTED)</span>';
+                } else {
+                  supBadge.innerHTML = `<span class="px-2 py-0.5 rounded text-[9px] font-black bg-red-500/20 text-red-400 border border-red-500/30">HAIJAUNGANISHWA (${statuses.supabaseStatus})</span>`;
+                }
+              }
+              
+              if (cpBadge) {
+                if (statuses.cpanelStatus === 'Connected') {
+                  cpBadge.innerHTML = '<span class="px-2 py-0.5 rounded text-[9px] font-black bg-green-500/20 text-green-400 border border-green-500/30">KIMEUNGANISHWA (CONNECTED)</span>';
+                } else {
+                  cpBadge.innerHTML = `<span class="px-2 py-0.5 rounded text-[9px] font-black bg-red-500/20 text-red-400 border border-red-500/30">HAIJAUNGANISHWA (${statuses.cpanelStatus})</span>`;
+                }
+              }
+            }
+          }, 150);
+        </script>
 
         <!-- Master Save Button for Combined Database Settings -->
         <div class="mt-6">

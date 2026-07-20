@@ -190,6 +190,10 @@ class SelvixDatabase {
     game.id = games.length > 0 ? Math.max(...games.map(g => g.id)) + 1 : 1;
     games.push(game);
     localStorage.setItem('selvix_games', JSON.stringify(games));
+    
+    if (window.appwrite && typeof window.appwrite.syncGame === 'function') {
+      window.appwrite.syncGame(game);
+    }
     return game;
   }
 
@@ -199,6 +203,10 @@ class SelvixDatabase {
     if (idx !== -1) {
       games[idx] = { ...games[idx], ...game };
       localStorage.setItem('selvix_games', JSON.stringify(games));
+      
+      if (window.appwrite && typeof window.appwrite.syncGame === 'function') {
+        window.appwrite.syncGame(games[idx]);
+      }
       return games[idx];
     }
     return null;
@@ -208,6 +216,10 @@ class SelvixDatabase {
     let games = this.getGames();
     games = games.filter(g => g.id !== parseInt(id));
     localStorage.setItem('selvix_games', JSON.stringify(games));
+    
+    if (window.appwrite && typeof window.appwrite.deleteGameFromServer === 'function') {
+      window.appwrite.deleteGameFromServer(id);
+    }
   }
 
   // --- Chats ---
@@ -221,6 +233,10 @@ class SelvixDatabase {
     chat.timestamp = new Date().toLocaleString();
     chats.push(chat);
     localStorage.setItem('selvix_chats', JSON.stringify(chats));
+    
+    if (window.appwrite && typeof window.appwrite.syncChatMessage === 'function') {
+      window.appwrite.syncChatMessage(chat);
+    }
     return chat;
   }
 
@@ -228,6 +244,10 @@ class SelvixDatabase {
     let chats = this.getChats();
     chats = chats.filter(c => c.id !== parseInt(id));
     localStorage.setItem('selvix_chats', JSON.stringify(chats));
+    
+    if (window.appwrite && typeof window.appwrite.deleteChatMessageFromServer === 'function') {
+      window.appwrite.deleteChatMessageFromServer(id);
+    }
   }
 
   // --- Settings ---
@@ -272,6 +292,10 @@ class SelvixDatabase {
     if (tx) {
       tx.status = status;
       localStorage.setItem('selvix_transactions', JSON.stringify(txs));
+      
+      if (window.appwrite && typeof window.appwrite.syncTransaction === 'function') {
+        window.appwrite.syncTransaction(tx);
+      }
     }
   }
 
