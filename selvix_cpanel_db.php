@@ -1,31 +1,39 @@
 <?php
 /**
  * ====================================================================
- *              SELVIX GAME ZONE - CPANEL SQL DATABASE BRIDGE
+ *              SELVIX GAME ZONE - CPANEL SQL TO SUPABASE BRIDGE
  * ====================================================================
  * 
  * MAELEKEZO YA MATUMIZI (HOW TO USE):
  * ----------------------------------
  * 1. Pakia (Upload) faili hili kwenye cPanel File Manager yako (mfano: public_html/selvix_cpanel_db.php).
- * 2. Badilisha maelezo ya kuunganisha na Database hapa chini (DB_HOST, DB_USER, DB_PASS, DB_NAME).
- * 3. Weka SECRET_KEY yako mwenyewe kwa ajili ya usalama wa mawasiliano ya App na server.
- * 4. Hakikisha umechagua "Tumia cPanel SQL" kwenye Admin Panel ya Selvix Game Zone kisha weka URL ya faili hili.
+ * 2. Sanidi SUPABASE_URL na SUPABASE_SERVICE_ROLE_KEY ama kwenye Environment Variables za server/cPanel
+ *    au moja kwa moja kwenye Configuration hapa chini (kupitia define).
+ * 3. Weka SECRET_KEY yako ya sasa ili kuzuia mtu asiyeidhinishwa kutumia endpoint hizi.
  * 
- * Mfumo utatengeneza majedwali (Tables) husika moja kwa moja endapo hayatakuwepo!
+ * Sasa, mawasiliano yote ya cPanel SQL yataelekezwa moja kwa moja kwenye Supabase kwa usalama wa hali ya juu!
+ * Service Role Key haitafichuliwa kabisa upande vya Frontend kwani inabaki upande wa server ya cPanel pekee.
  */
 
-// --- 1. CONFIGURATION (BADILISHA HAPA) ---
-define('DB_HOST', 'localhost');
-define('DB_USER', 'YAKO_USER');     // Weka database username ya cPanel hapa
-define('DB_PASS', 'YAKO_PASSWORD'); // Weka database password ya cPanel hapa
-define('DB_NAME', 'YAKO_DATABASE'); // Weka database name ya cPanel hapa
+// --- 1. CONFIGURATION / MAZINGIRA (BADILISHA HAPA) ---
 
-// Weka neno la siri la kulinda usalama (Secret Key) - lazima ilingane na uliyoweka kwenye Admin Panel
+// Unaweza kuweka hapa chini au kutumia Environment Variables za cPanel (Inayopendekezwa kwa usalama zaidi)
+$envUrl = getenv('SUPABASE_URL');
+$envKey = getenv('SUPABASE_SERVICE_ROLE_KEY');
+
+define('SUPABASE_URL', !empty($envUrl) ? $envUrl : 'https://hgwuamjulxpysixjojxp.supabase.co');
+define('SUPABASE_SERVICE_ROLE_KEY', !empty($envKey) ? $envKey : 'WEKA_SERVICE_ROLE_KEY_YAKO_YA_SUPABASE'); 
+
+// Majina ya Tables kwenye Supabase
+define('SUPABASE_USERS_TABLE', 'users');
+define('SUPABASE_TXS_TABLE', 'selvix_transactions');
+
+// Weka neno la siri la kulinda usalama (Secret Key) linalolingana na lile la Admin Panel ya Selvix
 define('SECRET_KEY', 'selvix_secure_key_123'); 
 
 // --- 2. USALAMA NA CORS HEADERS ---
 header("Access-Control-Allow-Origin: *");
-header("Access-Control-Allow-Headers: Content-Type, X-Selvix-Key");
+header("Access-Control-Allow-Headers: Content-Type, X-Selvix-Key, Authorization");
 header("Access-Control-Allow-Methods: POST, GET, OPTIONS");
 header("Content-Type: application/json; charset=UTF-8");
 
@@ -46,154 +54,194 @@ if ($clientKey !== SECRET_KEY) {
     exit();
 }
 
-// --- 3. KUUNGANISHA DATABASE ---
-$conn = new mysqli(DB_HOST, DB_USER, DB_PASS, DB_NAME);
-if ($conn->connect_error) {
+// Hakikisha credentials za Supabase zipo
+if (empty(SUPABASE_URL) || SUPABASE_SERVICE_ROLE_KEY === 'WEKA_SERVICE_ROLE_KEY_YAKO_YA_SUPABASE' || empty(SUPABASE_SERVICE_ROLE_KEY)) {
+    http_response_code(500);
     echo json_encode([
         "success" => false,
-        "message" => "Imeshindwa kuunganisha database ya cPanel: " . $conn->connect_error
+        "message" => "UTANGAULIZI: SUPABASE_URL au SUPABASE_SERVICE_ROLE_KEY haijawekwa vizuri kwenye faili la PHP au mazingira ya cPanel."
     ]);
     exit();
 }
 
-// --- 4. KUTENGENEZA MAJEDWALI AUTOMATIC (AUTO-MIGRATE TABLES) ---
-$createUsersTable = "CREATE TABLE IF NOT EXISTS selvix_users (
-    username VARCHAR(100) PRIMARY KEY,
-    fullName VARCHAR(255) NOT NULL,
-    phoneNumber VARCHAR(50) NOT NULL,
-    password VARCHAR(255) NOT NULL,
-    isAdmin TINYINT(1) DEFAULT 0,
-    isBlockedFromChatting TINYINT(1) DEFAULT 0,
-    pointsBalance DECIMAL(15, 2) DEFAULT 100.00,
-    streakCount INT DEFAULT 0,
-    lastRewardClaimedDate VARCHAR(100) DEFAULT '',
-    referredBy VARCHAR(100) DEFAULT '',
-    createdDate VARCHAR(100) DEFAULT ''
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;";
+// --- 3. HELPER FUNCTION TO COMMUNICATE WITH SUPABASE REST API ---
+function callSupabase($endpoint, $method = 'GET', $body = null, $extraHeaders = []) {
+    $url = rtrim(SUPABASE_URL, '/') . '/' . ltrim($endpoint, '/');
+    $ch = curl_init();
+    
+    $headers = [
+        "apikey: " . SUPABASE_SERVICE_ROLE_KEY,
+        "Authorization: Bearer " . SUPABASE_SERVICE_ROLE_KEY,
+        "Content-Type: application/json"
+    ];
+    
+    foreach ($extraHeaders as $h) {
+        $headers[] = $h;
+    }
+    
+    if ($method === 'POST') {
+        curl_setopt($ch, CURLOPT_POST, true);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($body));
+    } elseif ($method === 'PATCH') {
+        curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'PATCH');
+        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($body));
+    } elseif ($method === 'DELETE') {
+        curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'DELETE');
+    }
+    
+    curl_setopt($ch, CURLOPT_URL, $url);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false); // Inazuia matatizo ya SSL certificates kwenye hosting mbalimbali
+    curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+    
+    $response = curl_exec($ch);
+    $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $error = curl_error($ch);
+    curl_close($ch);
+    
+    return [
+        "code" => $http_code,
+        "response" => $response,
+        "error" => $error
+    ];
+}
 
-$createTxsTable = "CREATE TABLE IF NOT EXISTS selvix_transactions (
-    id VARCHAR(100) PRIMARY KEY,
-    reference VARCHAR(100) NOT NULL,
-    username VARCHAR(100) NOT NULL,
-    gameId INT NOT NULL,
-    phonenumber VARCHAR(50) NOT NULL,
-    amount DECIMAL(15, 2) NOT NULL,
-    status VARCHAR(50) NOT NULL,
-    created VARCHAR(100) DEFAULT ''
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;";
-
-$conn->query($createUsersTable);
-$conn->query($createTxsTable);
-
-// --- 5. SIKILIZA MAOMBI (ENDPOINT ACTIONS) ---
+// --- 4. SIKILIZA MAOMBI (ENDPOINT ACTIONS) ---
 $action = isset($_GET['action']) ? $_GET['action'] : '';
 
 switch ($action) {
     case 'ping':
-        echo json_encode([
-            "success" => true,
-            "message" => "Connection ipo vizuri! Mfumo wa cPanel SQL umeanza kufanya kazi kikamilifu."
-        ]);
+        // Fanya jaribio la kusoma data kidogo kwenye Supabase ili kuthibitisha connection
+        $testResult = callSupabase('/rest/v1/' . SUPABASE_USERS_TABLE . '?limit=1', 'GET');
+        
+        if ($testResult['code'] >= 200 && $testResult['code'] < 300) {
+            echo json_encode([
+                "success" => true,
+                "message" => "Connection ipo vizuri sana! cPanel Bridge imefanikiwa kuunganisha Supabase kikamilifu."
+            ]);
+        } else {
+            echo json_encode([
+                "success" => false,
+                "message" => "cPanel Bridge inafanya kazi, lakini imeshindwa kuwasiliana na Supabase. HTTP Code: " . $testResult['code'] . ". Error: " . $testResult['error'] . ". Response: " . $testResult['response']
+            ]);
+        }
         break;
 
     case 'get_user':
-        $username = isset($_GET['username']) ? $conn->real_escape_string(strtolower(trim($_GET['username']))) : '';
+        $username = isset($_GET['username']) ? strtolower(trim($_GET['username'])) : '';
         if (empty($username)) {
             echo json_encode(["success" => false, "message" => "Username inahitajika"]);
             break;
         }
-        $res = $conn->query("SELECT * FROM selvix_users WHERE username = '$username'");
-        if ($res && $row = $res->fetch_assoc()) {
-            $row['isAdmin'] = (bool)$row['isAdmin'];
-            $row['isBlockedFromChatting'] = (bool)$row['isBlockedFromChatting'];
-            $row['pointsBalance'] = (float)$row['pointsBalance'];
-            $row['streakCount'] = (int)$row['streakCount'];
-            echo json_encode(["success" => true, "data" => $row]);
+        
+        $res = callSupabase('/rest/v1/' . SUPABASE_USERS_TABLE . '?username=eq.' . urlencode($username), 'GET');
+        
+        if ($res['code'] >= 200 && $res['code'] < 300) {
+            $data = json_decode($res['response'], true);
+            if (is_array($data) && count($data) > 0) {
+                $row = $data[0];
+                // Hakikisha aina za data zinalingana na mfumo wa sasa
+                $row['isAdmin'] = filter_var($row['isAdmin'], FILTER_VALIDATE_BOOLEAN);
+                $row['isBlockedFromChatting'] = filter_var($row['isBlockedFromChatting'], FILTER_VALIDATE_BOOLEAN);
+                $row['pointsBalance'] = (float)$row['pointsBalance'];
+                $row['streakCount'] = (int)$row['streakCount'];
+                echo json_encode(["success" => true, "data" => $row]);
+            } else {
+                echo json_encode(["success" => false, "message" => "Mtumiaji hajapatikana"]);
+            }
         } else {
-            echo json_encode(["success" => false, "message" => "Mtumiaji hajapatikana"]);
+            echo json_encode(["success" => false, "message" => "Kosa la Supabase (HTTP " . $res['code'] . "): " . $res['response']]);
         }
         break;
 
     case 'save_user':
-        $data = json_decode(file_get_contents("php://input"), true);
-        if (!$data || !isset($data['username'])) {
+        $rawData = json_decode(file_get_contents("php://input"), true);
+        if (!$rawData || !isset($rawData['username'])) {
             echo json_encode(["success" => false, "message" => "Data hazijakamilika"]);
             break;
         }
         
-        $username = $conn->real_escape_string(strtolower(trim($data['username'])));
-        $fullName = $conn->real_escape_string($data['fullName']);
-        $phoneNumber = $conn->real_escape_string($data['phoneNumber']);
-        $password = $conn->real_escape_string($data['password']);
-        $isAdmin = isset($data['isAdmin']) ? ($data['isAdmin'] ? 1 : 0) : 0;
-        $isBlockedFromChatting = isset($data['isBlockedFromChatting']) ? ($data['isBlockedFromChatting'] ? 1 : 0) : 0;
-        $pointsBalance = isset($data['pointsBalance']) ? (float)$data['pointsBalance'] : 100.00;
-        $streakCount = isset($data['streakCount']) ? (int)$data['streakCount'] : 0;
-        $lastRewardClaimedDate = $conn->real_escape_string(isset($data['lastRewardClaimedDate']) ? $data['lastRewardClaimedDate'] : '');
-        $referredBy = $conn->real_escape_string(isset($data['referredBy']) ? $data['referredBy'] : '');
-        $createdDate = $conn->real_escape_string(isset($data['createdDate']) ? $data['createdDate'] : date('Y-m-d H:i:s'));
-
-        // UPSERT kuingiza au kufanya update kama yupo
-        $sql = "INSERT INTO selvix_users 
-                (username, fullName, phoneNumber, password, isAdmin, isBlockedFromChatting, pointsBalance, streakCount, lastRewardClaimedDate, referredBy, createdDate)
-                VALUES 
-                ('$username', '$fullName', '$phoneNumber', '$password', $isAdmin, $isBlockedFromChatting, $pointsBalance, $streakCount, '$lastRewardClaimedDate', '$referredBy', '$createdDate')
-                ON DUPLICATE KEY UPDATE 
-                fullName = '$fullName',
-                phoneNumber = '$phoneNumber',
-                password = '$password',
-                isAdmin = $isAdmin,
-                isBlockedFromChatting = $isBlockedFromChatting,
-                pointsBalance = $pointsBalance,
-                streakCount = $streakCount,
-                lastRewardClaimedDate = '$lastRewardClaimedDate',
-                referredBy = '$referredBy'";
-
-        if ($conn->query($sql)) {
-            echo json_encode(["success" => true, "message" => "Taarifa za mtumiaji zimehifadhiwa/kusawazishwa kwenye cPanel Database."]);
+        // Kutengeneza payload safi ya kuingiza Supabase
+        $payload = [
+            "username" => strtolower(trim($rawData['username'])),
+            "fullName" => trim($rawData['fullName']),
+            "phoneNumber" => trim($rawData['phoneNumber']),
+            "password" => $rawData['password'],
+            "isAdmin" => isset($rawData['isAdmin']) ? filter_var($rawData['isAdmin'], FILTER_VALIDATE_BOOLEAN) : false,
+            "isBlockedFromChatting" => isset($rawData['isBlockedFromChatting']) ? filter_var($rawData['isBlockedFromChatting'], FILTER_VALIDATE_BOOLEAN) : false,
+            "pointsBalance" => isset($rawData['pointsBalance']) ? (float)$rawData['pointsBalance'] : 100.00,
+            "streakCount" => isset($rawData['streakCount']) ? (int)$rawData['streakCount'] : 0,
+            "lastRewardClaimedDate" => isset($rawData['lastRewardClaimedDate']) ? trim($rawData['lastRewardClaimedDate']) : '',
+            "referredBy" => isset($rawData['referredBy']) ? strtolower(trim($rawData['referredBy'])) : '',
+            "createdDate" => isset($rawData['createdDate']) ? trim($rawData['createdDate']) : date('Y-m-d H:i:s')
+        ];
+        
+        // Tumia upsert (kuongeza mpya au kufanya update kama yupo tayari)
+        $extraHeaders = [
+            "Prefer: resolution=merge-duplicates"
+        ];
+        
+        $res = callSupabase('/rest/v1/' . SUPABASE_USERS_TABLE, 'POST', $payload, $extraHeaders);
+        
+        if ($res['code'] >= 200 && $res['code'] < 300) {
+            echo json_encode(["success" => true, "message" => "Taarifa za mtumiaji zimehifadhiwa/kusawazishwa kwenye Supabase Database."]);
         } else {
-            echo json_encode(["success" => false, "message" => "Imeshindwa kuhifadhi: " . $conn->error]);
+            echo json_encode(["success" => false, "message" => "Kosa la kuhifadhi Supabase (HTTP " . $res['code'] . "): " . $res['response']]);
         }
         break;
 
     case 'insert_transaction':
-        $data = json_decode(file_get_contents("php://input"), true);
-        if (!$data || !isset($data['reference'])) {
+        $rawData = json_decode(file_get_contents("php://input"), true);
+        if (!$rawData || !isset($rawData['reference'])) {
             echo json_encode(["success" => false, "message" => "Data za muamala hazijakamilika"]);
             break;
         }
 
-        $id = $conn->real_escape_string(isset($data['id']) ? $data['id'] : "TX-" . time() . rand(10, 99));
-        $reference = $conn->real_escape_string($data['reference']);
-        $username = $conn->real_escape_string(strtolower($data['username']));
-        $gameId = (int)$data['gameId'];
-        $phonenumber = $conn->real_escape_string($data['phonenumber']);
-        $amount = (float)$data['amount'];
-        $status = $conn->real_escape_string($data['status']);
-        $created = $conn->real_escape_string(isset($data['created']) ? $data['created'] : date('Y-m-d H:i:s'));
+        $payload = [
+            "id" => isset($rawData['id']) ? trim($rawData['id']) : "TX-" . time() . rand(10, 99),
+            "reference" => trim($rawData['reference']),
+            "username" => strtolower(trim($rawData['username'])),
+            "gameId" => (int)$rawData['gameId'],
+            "phonenumber" => trim($rawData['phonenumber']),
+            "amount" => (float)$rawData['amount'],
+            "status" => trim($rawData['status']),
+            "created" => isset($rawData['created']) ? trim($rawData['created']) : date('Y-m-d H:i:s')
+        ];
 
-        $sql = "INSERT INTO selvix_transactions (id, reference, username, gameId, phonenumber, amount, status, created)
-                VALUES ('$id', '$reference', '$username', $gameId, '$phonenumber', $amount, '$status', '$created')
-                ON DUPLICATE KEY UPDATE status = '$status'";
+        // Upsert muamala
+        $extraHeaders = [
+            "Prefer: resolution=merge-duplicates"
+        ];
 
-        if ($conn->query($sql)) {
-            echo json_encode(["success" => true, "message" => "Muamala umehifadhiwa cPanel SQL."]);
+        $res = callSupabase('/rest/v1/' . SUPABASE_TXS_TABLE, 'POST', $payload, $extraHeaders);
+
+        if ($res['code'] >= 200 && $res['code'] < 300) {
+            echo json_encode(["success" => true, "message" => "Muamala umehifadhiwa Supabase kikamilifu."]);
         } else {
-            echo json_encode(["success" => false, "message" => "Imeshindwa kuhifadhi muamala: " . $conn->error]);
+            echo json_encode(["success" => false, "message" => "Kosa la kuhifadhi muamala Supabase (HTTP " . $res['code'] . "): " . $res['response']]);
         }
         break;
 
     case 'get_all_users':
-        $res = $conn->query("SELECT * FROM selvix_users");
-        $users = [];
-        while ($row = $res->fetch_assoc()) {
-            $row['isAdmin'] = (bool)$row['isAdmin'];
-            $row['isBlockedFromChatting'] = (bool)$row['isBlockedFromChatting'];
-            $row['pointsBalance'] = (float)$row['pointsBalance'];
-            $row['streakCount'] = (int)$row['streakCount'];
-            $users[$row['username']] = $row;
+        $res = callSupabase('/rest/v1/' . SUPABASE_USERS_TABLE . '?select=*', 'GET');
+        
+        if ($res['code'] >= 200 && $res['code'] < 300) {
+            $data = json_decode($res['response'], true);
+            $users = [];
+            if (is_array($data)) {
+                foreach ($data as $row) {
+                    $row['isAdmin'] = filter_var($row['isAdmin'], FILTER_VALIDATE_BOOLEAN);
+                    $row['isBlockedFromChatting'] = filter_var($row['isBlockedFromChatting'], FILTER_VALIDATE_BOOLEAN);
+                    $row['pointsBalance'] = (float)$row['pointsBalance'];
+                    $row['streakCount'] = (int)$row['streakCount'];
+                    $users[$row['username']] = $row;
+                }
+            }
+            echo json_encode(["success" => true, "data" => $users]);
+        } else {
+            echo json_encode(["success" => false, "message" => "Kosa la Supabase (HTTP " . $res['code'] . "): " . $res['response']]);
         }
-        echo json_encode(["success" => true, "data" => $users]);
         break;
 
     default:
@@ -203,6 +251,4 @@ switch ($action) {
         ]);
         break;
 }
-
-$conn->close();
 ?>

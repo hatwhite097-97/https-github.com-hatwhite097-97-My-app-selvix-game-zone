@@ -585,6 +585,13 @@ class SelvixAppwrite {
         console.warn("Error syncing transaction to cPanel:", e);
       }
     }
+    if (this.isActive && this.supabase) {
+      try {
+        await this.supabase.from('selvix_transactions').upsert([txObj]);
+      } catch (e) {
+        console.warn("Error syncing transaction to Supabase:", e);
+      }
+    }
   }
 
   async callPaymentFunction(endpointName, payload) {
